@@ -1,0 +1,23 @@
+# === 排除 joplin 和 vdbench 项目 ===
+joplin/
+vdbench50406/
+
+# === 排除 Git 自身 ===
+.git/
+
+# === 排除 Node 依赖 ===
+node_modules/
+
+# === 排除凭证文件（包含 API key，绝对不能上传） ===
+.dsh/.credentials.yaml
+.credentials.yaml
+
+# === 排除临时文件 ===
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# === 排除 Python 缓存 ===
+__pycache__/
+*.pyc

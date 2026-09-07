@@ -1,0 +1,26 @@
+{
+  "unit": {
+    "name": "workspace",
+    "version": 2
+  },
+  "global": {
+    "initialized": true,
+    "workspaceIds": [
+      "4b8165d8-dd58-4dc8-9d1e-58fc71008535"
+    ],
+    "archivedSessionIds": []
+  },
+  "tables": {
+    "workspaces": {
+      "4b8165d8-dd58-4dc8-9d1e-58fc71008535": {
+        "path": "D:\\project\\dsh-workzone",
+        "title": "dsh-workzone",
+        "sessionIds": [
+          "session-7821a9cb-e851-4879-b86c-3ab5ad0967d8"
+        ],
+        "createdAt": "2026-09-03T12:54:40.794Z",
+        "updatedAt": "2026-09-03T12:54:42.767Z"
+      }
+    }
+  }
+}
