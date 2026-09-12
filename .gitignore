@@ -35,3 +35,15 @@ crmeb/*/target/
 
 # AI tools
 .claude/
+
+# Credentials (DO NOT COMMIT)
+.dsh/.credentials.yaml
+.credentials.yaml
+
+# Python
+__pycache__/
+*.pyc
+
+# Other projects
+joplin/
+vdbench50406/
