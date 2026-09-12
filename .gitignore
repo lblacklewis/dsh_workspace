@@ -1,23 +1,49 @@
-# === 排除 joplin 和 vdbench 项目 ===
-joplin/
-vdbench50406/
+# IDE
+.idea/
+*.iml
 
-# === 排除 Git 自身 ===
-.git/
+# uni-app
+app/unpackage/
 
-# === 排除 Node 依赖 ===
-node_modules/
-
-# === 排除凭证文件（包含 API key，绝对不能上传） ===
-.dsh/.credentials.yaml
-.credentials.yaml
-
-# === 排除临时文件 ===
-*.tmp
+# Logs
 *.log
+crmeb/LOG_HOME_IS_UNDEFINED
+crmeb_front_log
+
+# OS
 .DS_Store
 Thumbs.db
 
-# === 排除 Python 缓存 ===
+# Archives
+*.zip
+*.dump
+*.tar.gz
+*.rar
+*.7z
+
+# Node
+admin/node_modules/
+admin/dist/
+
+# Java build
+crmeb/target/
+crmeb/*/target/
+
+# Temp
+*.tmp
+~$*
+
+# AI tools
+.claude/
+
+# Credentials (DO NOT COMMIT)
+.dsh/.credentials.yaml
+.credentials.yaml
+
+# Python
 __pycache__/
 *.pyc
+
+# Other projects
+joplin/
+vdbench50406/
