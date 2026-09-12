@@ -26,11 +26,11 @@
 	} from "@/utils/theme.js";
 	var statusBarHeight = uni.getSystemInfoSync().statusBarHeight; //手机端头部手机时间位置高度
 	const legacyThemeColorMap = {
-		1: { theme_color: '#e93323', gradient_color: '#FF7931', sub_color: '#FE960F', light_color: '#FDD9D3' },
-		2: { theme_color: '#FE5C2D', gradient_color: '#FF9445', sub_color: '#FDB000', light_color: '#FEE0D2' },
-		3: { theme_color: '#42CA4D', gradient_color: '#70E038', sub_color: '#FE960F', light_color: '#DBF5D6' },
-		4: { theme_color: '#1DB0FC', gradient_color: '#40D1F4', sub_color: '#C4D9EC', light_color: '#D1F1FB' },
-		5: { theme_color: '#FF448F', gradient_color: '#FF67AD', sub_color: '#282828', light_color: '#FFD8E7' },
+		1: { theme_color: '#0D9488', gradient_color: '#14B8A6', sub_color: '#5EEAD4', light_color: '#CCFBF1' },
+		2: { theme_color: '#0F766E', gradient_color: '#0D9488', sub_color: '#2DD4BF', light_color: '#CCFBF1' },
+		3: { theme_color: '#115E59', gradient_color: '#0F766E', sub_color: '#14B8A6', light_color: '#F0FDFA' },
+		4: { theme_color: '#0891B2', gradient_color: '#06B6D4', sub_color: '#67E8F9', light_color: '#CFFAFE' },
+		5: { theme_color: '#0E7490', gradient_color: '#0891B2', sub_color: '#22D3EE', light_color: '#ECFEFF' },
 	};
 	// const app = getApp();
 	export default {
