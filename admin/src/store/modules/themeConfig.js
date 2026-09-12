@@ -12,9 +12,9 @@ const themeConfigModule = {
        * 全局主题
        */
       // 默认 primary 主题颜色
-      primary: '#0256FF',
+      primary: '#0D9488',
       // 菜单背景色
-      menuBgColor: '#282c34',
+      menuBgColor: '#134E4A',
       // 是否开启深色模式
       isIsDark: false,
       themeStyle: 'theme-2',
