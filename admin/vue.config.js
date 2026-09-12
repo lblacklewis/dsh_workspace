@@ -33,6 +33,13 @@ module.exports = {
   devServer: {
     port: port,
     open: false,
+    proxy: {
+      '/dev-api': {
+        target: 'http://82.156.226.192',
+        changeOrigin: true,
+        pathRewrite: { '^/dev-api': '/dev-api' },
+      },
+    },
     overlay: {
       warnings: false,
       errors: true,

@@ -1,22 +1,37 @@
+# IDE
 .idea/
-app/unpackage
-Crmeb-2022-01-04.log
-crmeb_front_log
+*.iml
+
+# uni-app
+app/unpackage/
+
+# Logs
+*.log
 crmeb/LOG_HOME_IS_UNDEFINED
-*.
-*.
+crmeb_front_log
+
+# OS
 .DS_Store
-<<<<<<< HEAD
-=======
+Thumbs.db
 
-# Large files
+# Archives
 *.zip
-
 *.dump
 *.tar.gz
 *.rar
 *.7z
 
-# Working directories
+# Node
+admin/node_modules/
+admin/dist/
+
+# Java build
+crmeb/target/
+crmeb/*/target/
+
+# Temp
+*.tmp
+~$*
+
+# AI tools
 .claude/
->>>>>>> 6332e5584c59ad3c1c3eab43b79261a53c5a20e6

@@ -90,7 +90,6 @@ const maintainRouter = {
       },
       hidden: false,
     },
-    }, //sensitiveList
     {
       path: 'logistics',
       name: 'Logistics',

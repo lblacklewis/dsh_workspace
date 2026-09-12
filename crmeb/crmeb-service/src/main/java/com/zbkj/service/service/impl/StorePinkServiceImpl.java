@@ -37,6 +37,7 @@ import com.zbkj.service.dao.StorePinkDao;
 import com.zbkj.service.service.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,6 +67,7 @@ public class StorePinkServiceImpl extends ServiceImpl<StorePinkDao, StorePink> i
     @Autowired
     private UserService userService;
 
+    @Lazy
     @Autowired
     private OrderService orderService;
 

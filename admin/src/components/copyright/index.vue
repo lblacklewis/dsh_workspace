@@ -7,22 +7,16 @@
 </template>
 <script>
 // +----------------------------------------------------------------------
-// | CRMEB [ CRMEB赋能开发者，助力企业发展 ]
+// | StorApp 品牌定制版
 // +----------------------------------------------------------------------
-// | Copyright (c) 2016~2023 https://www.crmeb.com All rights reserved.
-// +----------------------------------------------------------------------
-// | Licensed CRMEB并不是自由软件，未经许可不能去掉CRMEB相关版权
-// +----------------------------------------------------------------------
-// | Author: CRMEB Team <admin@crmeb.com>
-// +----------------------------------------------------------------------
-
 import { getCopyrightInfo } from '@/libs/copyPublic';
+import BRAND from '@/config/brand';
 
 export default {
   name: 'i-copyright',
   data() {
     return {
-      copyright: 'Copyright © 2025 西安众邦网络科技有限公司',
+      copyright: BRAND.copyright,
       copyrightNew: '',
     };
   },

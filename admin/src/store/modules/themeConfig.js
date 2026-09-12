@@ -93,11 +93,11 @@ const themeConfigModule = {
        * 全局网站标题 / 副标题
        */
       // 网站主标题（菜单导航、浏览器当前网页标题）
-      globalTitle: 'crmeb-admin',
+      globalTitle: 'StorApp',
       // 网站副标题（登录页顶部文字）
-      globalViceTitle: '',
+      globalViceTitle: 'StorApp',
       // 网站描述（登录页顶部文字）
-      globalViceDes: 'vue2',
+      globalViceDes: '智能存储管理平台',
       // 默认初始语言，可选值"<zh-cn|en|zh-tw>"，默认 zh-cn
       globalI18n: 'zh-cn',
       // 默认全局组件大小，可选值"<|medium|small|mini>"，默认 ''

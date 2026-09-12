@@ -44,20 +44,26 @@ public class ScheduleJobServiceImpl extends ServiceImpl<ScheduleJobDao, Schedule
 
     /**
      * 项目启动时，初始化定时器
+     * 如果quartz表不存在则跳过（demo模式容错）
      */
     @PostConstruct
     public void init() {
-        getAll().forEach(scheduleJob -> {
-            CronTrigger trigger = scheduleManager.getCronTrigger(scheduleJob);
-            // 如果定时任务不存在，则创建定时任务
-            if (trigger == null) {
-                scheduleManager.createScheduleJob(scheduleJob);
-            } else if (ScheduleConstants.NORMAL.equals(scheduleJob.getStatus())) {
-                scheduleManager.resumeJob(scheduleJob);
-            } else if (ScheduleConstants.PAUSE.equals(scheduleJob.getStatus())) {
-                scheduleManager.pauseJob(scheduleJob);
-            }
-        });
+        try {
+            getAll().forEach(scheduleJob -> {
+                CronTrigger trigger = scheduleManager.getCronTrigger(scheduleJob);
+                // 如果定时任务不存在，则创建定时任务
+                if (trigger == null) {
+                    scheduleManager.createScheduleJob(scheduleJob);
+                } else if (ScheduleConstants.NORMAL.equals(scheduleJob.getStatus())) {
+                    scheduleManager.resumeJob(scheduleJob);
+                } else if (ScheduleConstants.PAUSE.equals(scheduleJob.getStatus())) {
+                    scheduleManager.pauseJob(scheduleJob);
+                }
+            });
+        } catch (Exception e) {
+            // Demo模式：quartz表可能不存在，跳过定时任务初始化
+            System.err.println("ScheduleJob init skipped (demo mode): " + e.getMessage());
+        }
     }
 
     /**
