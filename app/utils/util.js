@@ -37,18 +37,9 @@ export default {
 			})
 			// #endif
 		} else {
-			// tabBar 页面必须用 switchTab，否则底部导航会消失
-			// 用前缀匹配兼容带参数/带斜杠的链接 (如 /pages/goods_cate/goods_cate?id=1)
-			const tabBarPages = [
-				'/pages/index/index',
-				'/pages/goods_cate/goods_cate',
-				'/pages/order_addcart/order_addcart',
-				'/pages/user/index',
-				'/pages/discover_index/index'
-			];
-			const targetPath = url.split('?')[0].replace(/\/+$/, '');
-			const isTabBar = tabBarPages.indexOf(targetPath) !== -1;
-			if (!isTabBar) {
+			if (['/pages/goods_cate/goods_cate', '/pages/order_addcart/order_addcart', '/pages/user/index',
+					'/pages/discover_index/index', '/pages/index/index'
+				].indexOf(url) == -1) {
 				uni.navigateTo({
 					animationType: animationType.type,
 					animationDuration: animationType.duration,
@@ -58,7 +49,7 @@ export default {
 				uni.switchTab({
 					animationType: animationType.type,
 					animationDuration: animationType.duration,
-					url: targetPath
+					url: url
 				})
 			}
 		}
