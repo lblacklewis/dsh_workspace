@@ -167,6 +167,7 @@
 </script>
 
 <style scoped lang="scss">
+	/* 顶部搜索栏 - 医药 teal 风格 */
 	.productSort .header {
 		width: 100%;
 		height: 96rpx;
@@ -176,128 +177,141 @@
 		right: 0;
 		top: 0;
 		z-index: 9;
-		border-bottom: 1rpx solid #f5f5f5;
+		border-bottom: 1rpx solid #F1F5F9;
 	}
-	
+
 	.productSort .header .input {
 		width: 700rpx;
-		height: 60rpx;
-		background-color: #f5f5f5;
-		border-radius: 50rpx;
+		height: 64rpx;
+		background-color: #F0FDFA;
+		border: 2rpx solid #CCFBF1;
+		border-radius: 32rpx;
 		box-sizing: border-box;
-		padding: 0 25rpx;
+		padding: 0 28rpx;
 	}
-	
+
 	.productSort .header .input .iconfont {
-		font-size: 26rpx;
-		color: #555;
+		font-size: 28rpx;
+		color: #0D9488;
 	}
-	
+
 	.productSort .header .input .placeholder {
-		color: #999;
+		color: #94A3B8;
 	}
-	
+
 	.productSort .header .input input {
 		font-size: 26rpx;
 		height: 100%;
-		width: 597rpx;
+		width: 580rpx;
+		color: #1E293B;
 	}
-	
+
+	/* 左侧分类栏 - 浅色卡片风 */
 	.productSort .aside {
 		position: fixed;
 		width: 180rpx;
 		left: 0;
-		top:0;
-		background-color: #f7f7f7;
+		top: 0;
+		background-color: #F8FAFC;
 		overflow-y: scroll;
 		overflow-x: hidden;
-		
 		height: auto;
 		margin-top: 96rpx;
+		padding-bottom: 120rpx;
 	}
-	
+
 	.productSort .aside .item {
 		height: 100rpx;
 		width: 100%;
 		font-size: 26rpx;
-		color: #424242;
+		color: #475569;
 		position: relative;
+		transition: all .2s;
 	}
+
 	.productSort .aside .item.on {
 		background-color: #fff;
 		width: 100%;
 		text-align: center;
-		@include main_color(theme);
+		color: #0D9488;
 		font-weight: bold;
 	}
-	.productSort .aside .item.on ::before{
+
+	.productSort .aside .item.on ::before {
 		content: '';
-		width: 4rpx;
-		height: 100rpx;
+		width: 6rpx;
+		height: 40rpx;
+		border-radius: 0 6rpx 6rpx 0;
 		position: absolute;
 		left: 0;
-		top: 0;
-		@include main_bg_color(theme);
+		top: 30rpx;
+		background-color: #0D9488;
 	}
-	
+
+	/* 右侧内容区 */
 	.productSort .conter {
 		position: relative;
 		margin: 96rpx 0 0 180rpx;
 		padding: 0 14rpx;
 		background-color: #fff;
+		/* 给底部导航留出空间 */
+		padding-bottom: 140rpx;
 	}
-	
+
 	.productSort .conter .listw {
 		padding-top: 20rpx;
 	}
-	
+
 	.productSort .conter .listw .title {
 		height: 90rpx;
 	}
-	
+
 	.productSort .conter .listw .title .line {
-		width: 100rpx;
+		width: 80rpx;
 		height: 2rpx;
-		background-color: #f0f0f0;
+		background-color: #CCFBF1;
 	}
-	
+
 	.productSort .conter .listw .title .name {
 		font-size: 28rpx;
-		color: #333;
-		margin: 0 30rpx;
-		font-weight: bold;
+		color: #134E4A;
+		margin: 0 24rpx;
+		font-weight: 600;
 	}
-	
+
 	.productSort .conter .list {
 		flex-wrap: wrap;
 	}
-	
+
 	.productSort .conter .list .item {
 		width: 177rpx;
 		margin-top: 26rpx;
 	}
-	
+
+	/* 分类图标 - 圆角方形浅色底 (医药风格) */
 	.productSort .conter .list .item .picture {
 		width: 120rpx;
 		height: 120rpx;
-		border-radius: 50%;
+		border-radius: 24rpx;
+		background-color: #F0FDFA !important;
+		overflow: hidden;
 	}
-	
+
 	.productSort .conter .list .item .picture image {
 		width: 100%;
 		height: 100%;
-		border-radius: 50%;
-		div{
-			background-color: #f7f7f7;
-		}
+		border-radius: 24rpx;
 	}
-	
+
 	.productSort .conter .list .item .name {
 		font-size: 24rpx;
-		color: #333;
+		color: #475569;
 		height: 56rpx;
 		line-height: 56rpx;
 		width: 120rpx;
 		text-align: center;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>
