@@ -7,7 +7,7 @@
 				<view class='header acea-row row-center-wrapper' :style="{top: iStatusBarHeight + 'px'}">
 					<view class='acea-row row-between-wrapper input'>
 						<text class='iconfont icon-sousuo'></text>
-						<input type='text' placeholder='点击搜索商品信息' @confirm="searchSubmitValue" confirm-type='search' name="search"
+						<input type='text' placeholder='搜索药品、症状、品牌' @confirm="searchSubmitValue" confirm-type='search' name="search"
 						 placeholder-class='placeholder' maxlength="20"></input>
 					</view>
 				</view>
