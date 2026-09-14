@@ -26,7 +26,7 @@
 		position: relative;
 		top: 1.4rpx;
 		display: flex;
-		border: 1px solid #e93323;
+		border: 1px solid #0D9488;
 		border-radius: 4rpx;
 		height: 40rpx;
 		/*#ifdef MP*/
@@ -38,7 +38,7 @@
 		.bg-red {
 			font-size: 20rpx;
 			color: #fff;
-			background-color: #e93323;
+			background-color: #0D9488;
 			padding: 0 10rpx;
 			display: flex;
 			justify-content: center;
@@ -52,14 +52,14 @@
 		}
 		::v-deep .time {
 			font-size: 22rpx;
-			color: #e93323;
+			color: #0D9488;
 			align-items: center;
 			::v-deep .red {
 				margin: 0;
 			}
 		}
 		.red-color {
-			color: #e93323;
+			color: #0D9488;
 		}
 	}
 	.more-btn {
@@ -108,7 +108,7 @@
 		font-size: 30rpx;
 		font-weight: bold;
 		margin-top: 8rpx;
-		color: #e93323;
+		color: #0D9488;
 		text {
 			font-size: 20rpx;
 		}
