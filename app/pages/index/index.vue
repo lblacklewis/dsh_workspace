@@ -484,9 +484,21 @@ export default {
           url: `/pages/index/index`,
         });
       } else {
-        uni.navigateTo({
-          url: `/pages/activity/small_page/index?id=${item.microPage.id}`,
-        });
+        // 微页面ID为0时兜底：如果是tabBar页面用switchTab，否则跳分类列表
+        if (item.microPage.id && item.microPage.id > 0) {
+          uni.navigateTo({
+            url: `/pages/activity/small_page/index?id=${item.microPage.id}`,
+          });
+        } else if (item.classPage.id && item.classPage.id > 0) {
+          uni.navigateTo({
+            url: `/pages/goods/goods_list/index?cid=${item.classPage.id}&title=${item.classPage.name}`,
+          });
+        } else {
+          // 无有效ID → 跳药品分类
+          uni.switchTab({
+            url: `/pages/goods_cate/goods_cate`,
+          });
+        }
       }
     },
     getProductList(data) {
