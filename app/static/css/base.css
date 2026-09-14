@@ -1,17 +1,17 @@
 @charset "UTF-8";
 
 body,html {
-	background-color: #f5f5f5 !important;
+	background-color: #F8FAFC !important;
 	height: unset;
 }
 
 
 .icon-color {
-	color: #E93323
+	color: #0D9488
 }
 
 .cart-color {
-	/* color: #E93323 !important;
+	/* color: #0D9488 !important;
 	border: 1px solid #E93323 !important */
 }
 
@@ -196,7 +196,7 @@ body,html {
 
 page {
 	font-size: 28rpx;
-	background-color: #f5f5f5 !important;
+	background-color: #F8FAFC !important;
 	color: #333;
 	/* height: 100%; */
 }
@@ -220,7 +220,7 @@ radio .wx-radio-input {
 
 radio .wx-radio-input.wx-radio-input-checked {
 	/* border: 1px solid #E93323 !important;
-	background-color: #E93323 !important */
+	background-color: #0D9488 !important */
 }
 
 radio .uni-radio-input {
@@ -231,7 +231,7 @@ radio .uni-radio-input {
 
 radio .uni-radio-input.uni-radio-input-checked {
 	/* border: 1px solid #E93323 !important;
-	background-color: #E93323 !important */
+	background-color: #0D9488 !important */
 }
 
 checkbox .wx-checkbox-input {
@@ -243,7 +243,7 @@ checkbox .wx-checkbox-input {
 
 /* checkbox .wx-checkbox-input.wx-checkbox-input-checked {
 	border: 1px solid #E93323 !important;
-	background-color: #E93323 !important;
+	background-color: #0D9488 !important;
 	color: #fff!important;
 	margin-right: 0 !important;
 } */
@@ -260,7 +260,7 @@ checkbox .uni-checkbox-input {
 
 /* checkbox .uni-checkbox-input.uni-checkbox-input-checked {
 	border: 1px solid #E93323 !important;
-	background-color: #E93323 !important;
+	background-color: #0D9488 !important;
 	color: #fff!important
 } */
 
@@ -385,7 +385,7 @@ checkbox .uni-checkbox-input.uni-checkbox-input-checked::before {
 	margin-right: 10rpx;
 }
 .icon-color {
-	color: #E93323;
+	color: #0D9488;
 }
 .text-999{
 	color: #999999;
@@ -452,7 +452,7 @@ margin-bottom: 15rpx;
 }
 
 .cart-color {
-	/* color: #E93323 !important;
+	/* color: #0D9488 !important;
 	border: 1px solid #E93323 !important */
 }
 
@@ -730,7 +730,7 @@ radio .wx-radio-input {
 
 radio .wx-radio-input.wx-radio-input-checked {
 	/* border: 1px solid #E93323 !important;
-	background-color: #E93323 !important */
+	background-color: #0D9488 !important */
 }
 
 radio .uni-radio-input {
@@ -741,7 +741,7 @@ radio .uni-radio-input {
 
 radio .uni-radio-input.uni-radio-input-checked {
 	/* border: 1px solid #E93323 !important;
-	background-color: #E93323 !important */
+	background-color: #0D9488 !important */
 }
 
 checkbox .wx-checkbox-input {
