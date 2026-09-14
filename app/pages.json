@@ -34,7 +34,7 @@
 		{
 			"path": "pages/order_addcart/order_addcart",
 			"style": {
-				"navigationBarTitleText": "购物车",
+				"navigationBarTitleText": "购药车",
 				"navigationStyle": "custom",
 				"app-plus": {
 					// // #ifdef APP-PLUS
@@ -118,7 +118,7 @@
 				{
 					"path": "user_goods_collection/index",
 					"style": {
-						"navigationBarTitleText": "收藏商品",
+						"navigationBarTitleText": "收藏药品",
 						"app-plus": {
 							// #ifdef APP-PLUS
 							"titleNView": {
@@ -488,7 +488,7 @@
 							// #ifdef MP || APP-PLUS
 							,
 						"navigationBarTextStyle": "#fff",
-						"navigationBarBackgroundColor": "#e93323"
+						"navigationBarBackgroundColor": "#0D9488"
 							// #endif
 							,
 						"app-plus": {
@@ -546,7 +546,7 @@
 				{
 					"path": "goods_search/index",
 					"style": {
-						"navigationBarTitleText": "搜索商品",
+						"navigationBarTitleText": "搜索药品",
 						"navigationStyle": "custom",
 						"app-plus": {
 							// #ifdef APP-PLUS
@@ -625,7 +625,7 @@
 				{
 					"path": "goods_list/index",
 					"style": {
-						"navigationBarTitleText": "商品列表",
+						"navigationBarTitleText": "药品列表",
 						"app-plus": {
 							// #ifdef APP-PLUS
 							"titleNView": {
@@ -773,7 +773,7 @@
 					"path": "user_phone/index",
 					"style": {
 						"navigationBarTitleText": "修改手机号",
-						"navigationBarBackgroundColor": "#e93323"
+						"navigationBarBackgroundColor": "#0D9488"
 							// #ifdef MP || APP-PLUS
 							,
 						"navigationBarTextStyle": "#fff"
@@ -792,7 +792,7 @@
 					"path": "user_pwd_edit/index",
 					"style": {
 						"navigationBarTitleText": "修改密码",
-						"navigationBarBackgroundColor": "#e93323"
+						"navigationBarBackgroundColor": "#0D9488"
 							// #ifdef MP || APP-PLUS
 							,
 						"navigationBarTextStyle": "#fff"
@@ -949,9 +949,9 @@
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "加载中...",
+		"navigationBarTitleText": "StorApp 健康药房",
 		"navigationBarBackgroundColor": "#fff",
-		"backgroundColor": "#F8F8F8",
+		"backgroundColor": "#F0FDFA",
 		"titleNView": false,
 		"rpxCalcMaxDeviceWidth": 960,
 		"rpxCalcBaseDeviceWidth": 375,
@@ -959,21 +959,33 @@
 	},
 	"tabBar": {
 		"custom": false,
-		"color": "#282828",
-		"selectedColor": "#fc4141",
+		"color": "#94A3B8",
+		"selectedColor": "#0D9488",
 		"borderStyle": "white",
 		"backgroundColor": "#ffffff",
 		"list": [{
-				"pagePath": "pages/index/index"
+				"pagePath": "pages/index/index",
+				"text": "首页",
+				"iconPath": "static/tabBar/index.png",
+				"selectedIconPath": "static/tabBar/indexd.png"
 			},
 			{
-				"pagePath": "pages/goods_cate/goods_cate"
+				"pagePath": "pages/goods_cate/goods_cate",
+				"text": "药品分类",
+				"iconPath": "static/tabBar/cate.png",
+				"selectedIconPath": "static/tabBar/cated.png"
 			},
 			{
-				"pagePath": "pages/order_addcart/order_addcart"
+				"pagePath": "pages/order_addcart/order_addcart",
+				"text": "购药车",
+				"iconPath": "static/tabBar/cart.png",
+				"selectedIconPath": "static/tabBar/cartd.png"
 			},
 			{
-				"pagePath": "pages/user/index"
+				"pagePath": "pages/user/index",
+				"text": "我的",
+				"iconPath": "static/tabBar/user.png",
+				"selectedIconPath": "static/tabBar/userd.png"
 			}
 		]
 	},
