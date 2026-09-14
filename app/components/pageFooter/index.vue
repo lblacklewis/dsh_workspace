@@ -212,6 +212,10 @@ export default {
       this.newData = data;
       this.showTabBar = data.effectConfig ? !!data.effectConfig.tabVal : true;
       let pdHeight = this.getVal(data.topConfig) + this.getVal(data.bottomConfig);
+      // 底部导航为 fixed 悬浮层，需按实际高度撑开占位，避免遮挡页面底部内容
+      const baseHeight = 96 + pdHeight;
+      const rpx2px = uni.getSystemInfoSync().windowWidth / 750;
+      this.footerHeight = Math.ceil(baseHeight * rpx2px);
       this.$emit(
         "newDataStatus",
         this.showTabBar,
