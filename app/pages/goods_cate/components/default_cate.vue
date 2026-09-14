@@ -109,9 +109,11 @@
 					let idView = "#b" + i;
 					query.select(idView).boundingClientRect();
 					query.exec(function(res) {
-						let top = res[0].top;
-						hightArr.push(top);
-						that.hightArr = hightArr
+						if (res && res[0]) {
+							let top = res[0].top;
+							hightArr.push(top);
+							that.hightArr = hightArr;
+						}
 					});
 				};
 			},
