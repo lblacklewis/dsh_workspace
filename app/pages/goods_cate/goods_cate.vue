@@ -34,6 +34,7 @@
 				winHeight:'',
 				configApi: {}, //分享类容配置
 				iStatusBarHeight: 0, // 状态栏高度
+				lockDefaultTemplate: true, // StorApp: 强制使用默认分类模板(与首页风格统一)
 			}
 		},
 		computed: mapGetters(['isLogin', 'uid']),
@@ -107,6 +108,12 @@
 				}).catch(() => {});
 			},
 			applyCategoryStatus(status) {
+				// StorApp: 固定使用默认分类模板，避免后台模板配置导致跳转到购物车样式
+				if (this.lockDefaultTemplate) {
+					this.$set(this, 'currentPage', 'one');
+					this.footerShow = true;
+					return;
+				}
 				let currentPage = categoryPageMap[String(status)];
 				if (!currentPage) return;
 				this.$set(this, 'currentPage', currentPage);
