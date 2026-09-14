@@ -6,7 +6,7 @@
 				<view class='input acea-row row-between-wrapper'>
 					<text class='iconfont icon-sousuo2'></text>
 					<input type='text' :value='searchValue'
-					:focus="focus" placeholder='点击搜索商品'
+					:focus="focus" placeholder='搜索药品'
 					confirm-type='search' @confirm="searchBut"
 					placeholder-class='placeholder' @input="setValue"
 					maxlength="20"></input>
