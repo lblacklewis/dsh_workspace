@@ -1,5 +1,17 @@
 <template>
 	<view :data-theme="theme">
+		<!-- 自定义导航栏(带返回按钮) -->
+		<view class="nav-bar">
+			<view class="nav-status" :style="{ height: statusBarHeight + 'px' }"></view>
+			<view class="nav-content">
+				<view class="nav-back" @tap="goBack">
+					<text class="iconfont icon-xiangzuo"></text>
+				</view>
+				<view class="nav-title">{{ id ? '编辑地址' : '新增地址' }}</view>
+			</view>
+		</view>
+		<view class="nav-placeholder" :style="{ height: (statusBarHeight + 44) + 'px' }"></view>
+
 		<form @submit="formSubmit" report-submit='true'>
 			<view class='addAddress pad30'>
 				<view class='list borRadius14'>
@@ -97,7 +109,8 @@
 				combination: false, //是否是拼团
 				secKill: false, //是否是秒杀
 				theme: app.globalData.theme,
-				showLoading: false
+				showLoading: false,
+				statusBarHeight: 0
 			};
 		},
 		computed: mapGetters(['isLogin']),
@@ -112,6 +125,12 @@
 			}
 		},
 		onLoad(options) {
+			// 状态栏高度(自定义导航栏用)
+			try {
+				this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0;
+			} catch (e) {
+				this.statusBarHeight = 0;
+			}
 			if (this.$Cache.getItem('cityList')) {
 				//检测城市数据缓存是否过期，有的话从缓存取，没有的话请求接口
 				this.district = this.$Cache.getItem('cityList');
@@ -140,6 +159,15 @@
 			}
 		},
 		methods: {
+			// 返回上一页
+			goBack() {
+				const pages = getCurrentPages();
+				if (pages.length > 1) {
+					uni.navigateBack({ delta: 1 });
+				} else {
+					uni.switchTab({ url: '/pages/user/index' });
+				}
+			},
 			// #ifdef APP-PLUS
 			// 获取选择的地区
 			handleGetRegion(region) {
@@ -612,5 +640,46 @@
 		@include coupons_border_color(theme);
 		color: #fff !important;
 		margin-right: 0 !important;
+	}
+
+	/* 自定义导航栏 */
+	.nav-bar {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 999;
+		background-color: #fff;
+		border-bottom: 1rpx solid #F1F5F9;
+	}
+
+	.nav-content {
+		height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+	}
+
+	.nav-back {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 88rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		.iconfont {
+			font-size: 40rpx;
+			color: #134E4A;
+		}
+	}
+
+	.nav-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #134E4A;
 	}
 </style>
