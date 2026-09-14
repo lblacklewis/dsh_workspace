@@ -689,6 +689,21 @@ export default {
     },
     goMenuPage(url) {
       if (!url) return;
+      // 无需登录即可访问的公共页面(首页/分类/搜索/资讯)，未登录时也直接跳转，
+      // 否则会跳登录页导致底部导航消失
+      const publicPaths = [
+        '/pages/index/index',
+        '/pages/goods_cate/goods_cate',
+        '/pages/goods/goods_search/index',
+        '/pages/goods/goods_list/index',
+        '/pages/news/news_list/index',
+        '/pages/order_addcart/order_addcart'
+      ];
+      const targetPath = url.split('?')[0].replace(/\/+$/, '');
+      if (!this.isLogin && publicPaths.indexOf(targetPath) !== -1) {
+        this.$util.JumpPath(url);
+        return;
+      }
       if (this.isLogin) {
         if (url.indexOf("http") === -1) {
           if (url== "/kefu/mobile_list") {
