@@ -49,7 +49,7 @@
 			theme: 'theme1', //主题色
 			publicLoginType: Cache.get('publicLoginType') ? Cache.get('publicLoginType') : '', //公众号登录方式(单选),1微信授权，2手机号登录
 			routinePhoneVerification: '', //小程序手机号校验类型（多选）1微信小程序验证 2短信验证
-			companyName: uni.getStorageSync('companyName') ? uni.getStorageSync('companyName') : '欢迎你', //公司名称
+			companyName: uni.getStorageSync('companyName') ? uni.getStorageSync('companyName') : 'StorApp 健康药房', //公司名称
 			tokenIsExist: false, //登录是否失效 false 失效，true没失效
 			mobileLoginLogo: uni.getStorageSync('mobileLoginLogo') || `${Cache.get("imgHost")}crmebimage/perset/staticImg/logo2.png` //登录页logo
 		},

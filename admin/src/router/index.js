@@ -21,7 +21,7 @@ import Layout from '@/layout';
 import storeRouter from './modules/store';
 import orderRouter from './modules/order';
 import userRouter from './modules/user';
-import distributionRouter from './modules/distribution';
+// import distributionRouter from './modules/distribution';  // 分销：医药不需要
 import marketingRouter from './modules/marketing';
 import financialRouter from './modules/financial';
 import contentRouter from './modules/content';
@@ -66,8 +66,6 @@ export const constantRoutes = [
   orderRouter,
   // 会员
   userRouter,
-  // 分销
-  distributionRouter,
   // 营销
   marketingRouter,
   // 财务
