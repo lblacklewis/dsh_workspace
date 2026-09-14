@@ -6,7 +6,7 @@
 				<view class="iconfont icon-xiangzuo" @click="goback()"></view>
 				<!-- #endif -->
 				<view class='input acea-row row-between-wrapper'><text class='iconfont icon-sousuo'></text>
-					<input placeholder='搜索商品名称' placeholder-class='placeholder' confirm-type='search' name="search"
+					<input placeholder='搜索药品名称' placeholder-class='placeholder' confirm-type='search' name="search"
 						:value='where.keyword' @confirm="searchSubmit" maxlength="20"></input>
 				</view>
 				<view class='iconfont' :class='is_switch==true?"icon-pailie":"icon-tupianpailie"' @click='Changswitch'>
