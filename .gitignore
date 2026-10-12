@@ -2,14 +2,6 @@
 .idea/
 *.iml
 
-# uni-app
-app/unpackage/
-
-# Logs
-*.log
-crmeb/LOG_HOME_IS_UNDEFINED
-crmeb_front_log
-
 # OS
 .DS_Store
 Thumbs.db
@@ -21,20 +13,9 @@ Thumbs.db
 *.rar
 *.7z
 
-# Node
-admin/node_modules/
-admin/dist/
-
-# Java build
-crmeb/target/
-crmeb/*/target/
-
 # Temp
 *.tmp
 ~$*
-
-# AI tools
-.claude/
 
 # Credentials (DO NOT COMMIT)
 .dsh/.credentials.yaml
@@ -44,6 +25,27 @@ crmeb/*/target/
 __pycache__/
 *.pyc
 
-# Other projects
-joplin/
-vdbench50406/
+# === 工程类项目：不随 DSH 配置同步（本地保留）===
+termdeck/
+admin/
+app/
+crmeb/
+WindTerm/
+loadrunner-tmssm/
+ifcfg-cfg/
+接口文档/
+.tmp-tools/
+
+# === CRMEB 残留文件 ===
+CRMEB 开源商城系统（Java版）安装必读.docx
+README_ZH.md
+LICENSE
+deploy.bat
+
+# === 压测 / 临时脚本 ===
+concurrent.sh
+concurrent_s3_load.sh
+concurrent_s3_load_v2.sh
+diag.sh
+dragdbg.cjs
+ip_expand.py
