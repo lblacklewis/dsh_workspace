@@ -4,6 +4,11 @@
 # [System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($false))。
 # 教训：2026-10-12 曾把 profiles/web/package.json 存成 UTF-8 with BOM，
 # 导致 dsh web 解析 JSON 失败、重启起不来。
+#
+# ⚠ 视觉模型备忘（2026-10-12 实测 api.scnet.cn 网关）：
+#   仅 deepseek-v4.1-flash 支持图片输入（inputModalities: [text, image]）。
+#   deepseek-v4-flash / deepseek-v4-pro / glm-5.3 / glm-5.3-flash 均为纯文本，
+#   传图会被网关丢弃（模型回"没看到图片"）。模型名已标注，选择时注意。
 ui-onboarding:
   welcomeNoticeVersion: 2026-08-13.1
 llm-deepseek:
@@ -12,7 +17,7 @@ llm-deepseek:
   reasoningEffort: high
   models:
     - id: deepseek-v4.1-flash
-      name: DeepSeek-V4.1-Flash
+      name: DeepSeek-V4.1-Flash 🖼 支持图片
       description: Fast, efficient, and economical; suited to focused, routine, or
         parallel tasks. Supports image input.
       contextWindow: 1000000
@@ -21,26 +26,26 @@ llm-deepseek:
         - image
       imagePixelBudget: low
     - id: deepseek-v4-flash
-      name: DeepSeek-V4-Flash
+      name: DeepSeek-V4-Flash（纯文本）
       description: Fast, efficient, and economical; suited to focused, routine, or
         parallel tasks.
       contextWindow: 1000000
       inputModalities:
         - text
     - id: deepseek-v4-pro
-      name: DeepSeek-V4-Pro
+      name: DeepSeek-V4-Pro（纯文本）
       description: Stronger agentic coding, knowledge, and difficult reasoning; suited
         to complex or quality-critical tasks at higher cost.
       contextWindow: 1000000
       inputModalities:
         - text
     - id: glm-5.3
-      name: GLM-5.3
+      name: GLM-5.3（纯文本）
       contextWindow: 1000000
       inputModalities:
         - text
     - id: glm-5.3-flash
-      name: GLM-5.3-Flash
+      name: GLM-5.3-Flash（纯文本）
       contextWindow: 1000000
       inputModalities:
         - text
