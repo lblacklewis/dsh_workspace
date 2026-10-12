@@ -1,7 +1,25 @@
+# ⚠ 编码模式备忘：本文件及 ~/.dsh 下所有配置文件、.dsh 仓库文件
+# 必须保存为 UTF-8 无 BOM（UTF-8 without BOM）。禁止用 PowerShell
+# Set-Content -Encoding UTF8（会写 BOM），改用 write 工具或
+# [System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($false))。
+# 教训：2026-10-12 曾把 profiles/web/package.json 存成 UTF-8 with BOM，
+# 导致 dsh web 解析 JSON 失败、重启起不来。
 ui-onboarding:
   welcomeNoticeVersion: 2026-08-13.1
 llm-deepseek:
+  baseURL: https://api.scnet.cn/api/gw/v1
+  apiKeyEnv: SCNET_API_KEY
+  reasoningEffort: high
   models:
+    - id: deepseek-v4.1-flash
+      name: DeepSeek-V4.1-Flash
+      description: Fast, efficient, and economical; suited to focused, routine, or
+        parallel tasks. Supports image input.
+      contextWindow: 1000000
+      inputModalities:
+        - text
+        - image
+      imagePixelBudget: low
     - id: deepseek-v4-flash
       name: DeepSeek-V4-Flash
       description: Fast, efficient, and economical; suited to focused, routine, or
@@ -9,4 +27,55 @@ llm-deepseek:
       contextWindow: 1000000
       inputModalities:
         - text
-  baseURL: https://api.scnet.cn/api/gw/v1
+    - id: deepseek-v4-pro
+      name: DeepSeek-V4-Pro
+      description: Stronger agentic coding, knowledge, and difficult reasoning; suited
+        to complex or quality-critical tasks at higher cost.
+      contextWindow: 1000000
+      inputModalities:
+        - text
+    - id: glm-5.3
+      name: GLM-5.3
+      contextWindow: 1000000
+      inputModalities:
+        - text
+    - id: glm-5.3-flash
+      name: GLM-5.3-Flash
+      contextWindow: 1000000
+      inputModalities:
+        - text
+    - id: gpt-5.6-terra-plus
+      name: gpt-5.6-terra-plus
+    - id: gpt-5.6-luna-plus
+      name: gpt-5.6-luna-plus
+agent-default-model:
+  provider: deepseek-official
+  model: deepseek-v4.1-flash
+  reasoningEffort: high
+skin-custom-theme:
+  applied: true
+  light:
+    accent: "#4d6bfe"
+    background: "#f7f8fa"
+    foreground: "#2c2b2b"
+    contrast: 10
+skin-wallpaper:
+  enabled: false
+ui-theme:
+  preference: light
+pet:
+  visible: false
+  size: 160
+  right: 2233
+  bottom: 180
+  petId: ouo-neko
+dsh-usage:
+  enabled: false
+remote-web-ui:
+  enabled: true
+  autoTunnel: true
+  lanBind: true
+llm-pi-ai:
+  providers: { deepseek: { apiKeyEnv: DEEPSEEK_API_KEY } }
+agent-presets:
+  default: standard
