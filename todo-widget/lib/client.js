@@ -64,7 +64,7 @@ window.__ModuleLoader__.load({
 
     /* ---------- 样式 ---------- */
     var CSS = [
-      '.dsh-todo-root{position:fixed;right:18px;bottom:18px;width:344px;max-height:64vh;',
+      '.dsh-todo-root{position:fixed;width:344px;max-height:64vh;',
       'display:flex;flex-direction:column;pointer-events:auto;z-index:9000;',
       'font-size:13px;line-height:1.55;font-family:inherit;',
       'color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-overlay);',
@@ -126,6 +126,25 @@ window.__ModuleLoader__.load({
       'color:var(--dsw-alias-state-error-primary);}',
       '.dsh-todo-empty{padding:14px 10px;text-align:center;font-size:12px;',
       'color:var(--dsw-alias-label-secondary);}',
+      '.dsh-todo-empty{padding:14px 10px;text-align:center;font-size:12px;',
+      'color:var(--dsw-alias-label-secondary);}',
+
+      /* 拖拽：root 跟随定位（inline style 覆盖 right/bottom），标题栏可拖动 */
+      '.dsh-todo-head{cursor:grab;}',
+      '.dsh-todo-head:active{cursor:grabbing;}',
+      '.dsh-todo-head:active{user-select:none;}',
+
+      /* 折叠球：圆形悬浮球，可拖动 */
+      '.dsh-todo-ball{position:fixed;z-index:9000;width:52px;height:52px;border-radius:50%;',
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;',
+      'pointer-events:auto;cursor:grab;touch-action:none;user-select:none;',
+      'font-size:20px;line-height:1;color:var(--dsw-alias-label-primary);',
+      'background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);',
+      'box-shadow:0 8px 24px rgba(0,0,0,.25);}',
+      '.dsh-todo-ball:active{cursor:grabbing;}',
+      '.dsh-todo-ball:hover{box-shadow:0 10px 30px rgba(0,0,0,.32);}',
+      '.dsh-todo-ball-badge{font-size:10px;line-height:1;color:var(--dsw-alias-brand-primary);',
+      'font-variant-numeric:tabular-nums;font-weight:600;}',
     ].join('')
 
     /* ---------- 组件 ---------- */
@@ -168,6 +187,92 @@ window.__ModuleLoader__.load({
         var errorState = react.useState('')
         var error = errorState[0]
         var setError = errorState[1]
+
+        /* 位置 state：默认右上角；localStorage 持久化。用 set 标记区分"是否拖过" */
+        var POS_KEY = 'dsh-todo-pos'
+        var posState = react.useState(function () {
+          try {
+            var raw = localStorage.getItem(POS_KEY)
+            if (raw) {
+              var p = JSON.parse(raw)
+              if (typeof p.left === 'number' && typeof p.top === 'number') {
+                /* 兼容旧格式（无 set 字段，当时存的是 {left,top}） */
+                return { set: true, left: p.left, top: p.top }
+              }
+              if (p && p.set === true && typeof p.left === 'number' && typeof p.top === 'number') return p
+            }
+          } catch (_e) { /* fall through */ }
+          return { set: false, left: 0, top: 0 }
+        })
+        var pos = posState[0]
+        var setPos = posState[1]
+
+        /* 拖拽：记录起始鼠标位置与窗口位置 */
+        var dragRef = react.useRef(null)
+        /* 拖动超过 3px 视为拖拽，吞掉随后的 click（避免误折叠/展开） */
+        var suppressClickRef = react.useRef(false)
+        var DRAG_THRESHOLD = 3
+
+        function bindDrag(targetRect, setter) {
+          dragRef.current = {
+            startX: 0, startY: 0,
+            left: targetRect.left, top: targetRect.top,
+            dx: 0, dy: 0, moved: false,
+          }
+          function onMove(me) {
+            var d = dragRef.current
+            if (!d) return
+            d.dx = me.clientX - d.startX
+            d.dy = me.clientY - d.startY
+            if (Math.abs(d.dx) > DRAG_THRESHOLD || Math.abs(d.dy) > DRAG_THRESHOLD) {
+              d.moved = true
+              suppressClickRef.current = true
+            }
+            setter({ set: true, left: d.left + d.dx, top: d.top + d.dy })
+          }
+          function onUp() {
+            var d = dragRef.current
+            if (d) {
+              try {
+                localStorage.setItem(POS_KEY, JSON.stringify({ set: true, left: d.left + d.dx, top: d.top + d.dy }))
+              } catch (_e) { /* ignore */ }
+            }
+            dragRef.current = null
+            document.removeEventListener('mousemove', onMove)
+            document.removeEventListener('mouseup', onUp)
+          }
+          document.addEventListener('mousemove', onMove)
+          document.addEventListener('mouseup', onUp)
+        }
+
+        function onHeadMouseDown(ev) {
+          if (ev.button !== 0) return
+          ev.preventDefault()
+          var rect = ev.currentTarget.closest('.dsh-todo-root').getBoundingClientRect()
+          bindDrag(rect, setPos)
+          dragRef.current.startX = ev.clientX
+          dragRef.current.startY = ev.clientY
+        }
+
+        function onBallMouseDown(ev) {
+          if (ev.button !== 0) return
+          ev.preventDefault()
+          ev.stopPropagation()
+          var rect = ev.currentTarget.getBoundingClientRect()
+          bindDrag(rect, setPos)
+          dragRef.current.startX = ev.clientX
+          dragRef.current.startY = ev.clientY
+        }
+
+        /* 吞掉拖拽后的 click */
+        function consumeClick(ev) {
+          ev.stopPropagation()
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false
+            return true
+          }
+          return false
+        }
 
         react.useEffect(function () {
           setItems(loadItems())
@@ -235,7 +340,11 @@ window.__ModuleLoader__.load({
 
         var head = e('div', {
           className: 'dsh-todo-head',
-          onClick: function () { setCollapsed(!collapsed) },
+          onClick: function (ev) {
+            if (consumeClick(ev)) return
+            setCollapsed(!collapsed)
+          },
+          onMouseDown: onHeadMouseDown,
           title: collapsed ? '展开待办清单' : '收起待办清单'
         },
           e('span', { className: 'dsh-todo-title' }, '📋 待办清单'),
@@ -243,8 +352,52 @@ window.__ModuleLoader__.load({
           e('span', { className: 'dsh-todo-chev' }, collapsed ? '▲' : '▼')
         )
 
+        /* 位置：组件左上角锚点（球与面板共用）。pos 有值 = 拖过，存实测 left/top */
+        var PANEL_W = 344
+        var PANEL_EST_H = 420   /* 估算高度用于 clamp（max-height 66vh 上下限之间） */
+        var BALL_SIZE = 52
+
+        function clampPos(left, top, w, h) {
+          var vw = typeof window !== 'undefined' ? window.innerWidth : 1280
+          var vh = typeof window !== 'undefined' ? window.innerHeight : 800
+          return {
+            left: Math.max(4, Math.min(left, vw - w - 4)),
+            top: Math.max(4, Math.min(top, vh - h - 4)),
+          }
+        }
+
+        /* 展开面板位置：直接是锚点，clamp 到视口内（球靠右时面板贴右，不藏屏幕外） */
+        var rootStyle
+        if (pos.set === true) {
+          var p = clampPos(pos.left, pos.top, PANEL_W, PANEL_EST_H)
+          rootStyle = { left: p.left + 'px', top: p.top + 'px' }
+        } else {
+          rootStyle = { right: '18px', top: '18px' }
+        }
+
+        /* 折叠：渲染成圆形球球，可拖动，点击展开 */
         if (collapsed) {
-          return e('div', { className: 'dsh-todo-root is-collapsed' }, head)
+          var todoCount = total - doneCount
+          var ballStyle
+          if (pos.set === true) {
+            var b = clampPos(pos.left, pos.top, BALL_SIZE, BALL_SIZE)
+            ballStyle = { left: b.left + 'px', top: b.top + 'px' }
+          } else {
+            ballStyle = { right: '18px', top: '18px' }
+          }
+          return e('div', {
+            className: 'dsh-todo-ball',
+            style: ballStyle,
+            onClick: function (ev) {
+              if (consumeClick(ev)) return
+              setCollapsed(false)
+            },
+            onMouseDown: onBallMouseDown,
+            title: '展开待办清单（' + todoCount + ' 项待办）'
+          },
+            e('span', null, '📋'),
+            e('span', { className: 'dsh-todo-ball-badge' }, todoCount > 0 ? String(todoCount) : '')
+          )
         }
 
         var newRow = e('div', { className: 'dsh-todo-new' },
@@ -328,7 +481,7 @@ window.__ModuleLoader__.load({
             : null
         )
 
-        return e('div', { className: 'dsh-todo-root' },
+        return e('div', { className: 'dsh-todo-root', style: rootStyle },
           head,
           error ? e('div', { className: 'dsh-todo-err' }, error) : null,
           newRow,
