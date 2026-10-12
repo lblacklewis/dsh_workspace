@@ -1,0 +1,54 @@
+# ============================================================================
+#  桌面版（DSH Desktop / Electron）专用 settings 模板
+# ----------------------------------------------------------------------------
+#  与 Web 版 settings.yaml 的差异（重要）：
+#    ✗ 不含 remote-web-ui —— 它会把 webserver 绑到 0.0.0.0 并开启配对门控，
+#      桌面版 Electron 渲染进程访问 /api 会被判为非配对来源 → HTTP 403
+#    ✗ 不含 skin-* / pet / dsh-usage —— 第三方 Web UI 插件配置，桌面版未装时无意义
+#    ✓ 只保留模型路由、默认模型、agent 预设等「通用」配置
+#
+#  用法：桌面版机器上运行  .\setup.ps1 -Mode desktop
+#        该模式不会复制 profiles/（桌面版 profile 由 Electron 独占管理）
+#
+#  ⚠ 编码：UTF-8 无 BOM
+# ============================================================================
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+llm-deepseek:
+  baseURL: https://api.scnet.cn/api/gw/v1
+  apiKeyEnv: SCNET_API_KEY
+  reasoningEffort: high
+  models:
+    - id: deepseek-v4.1-flash
+      name: DeepSeek-V4.1-Flash 🖼 支持图片
+      description: Fast, efficient, and economical; suited to focused, routine, or
+        parallel tasks. Supports image input.
+      contextWindow: 1000000
+      inputModalities:
+        - text
+        - image
+      imagePixelBudget: low
+    - id: deepseek-v4-flash
+      name: DeepSeek-V4-Flash（纯文本）
+      description: Fast, efficient, and economical; suited to focused, routine, or
+        parallel tasks.
+      contextWindow: 1000000
+      inputModalities:
+        - text
+    - id: deepseek-v4-pro
+      name: DeepSeek-V4-Pro（纯文本）
+      description: Stronger agentic coding, knowledge, and difficult reasoning; suited
+        to complex or quality-critical tasks at higher cost.
+      contextWindow: 1000000
+      inputModalities:
+        - text
+agent-default-model:
+  provider: deepseek-official
+  model: deepseek-v4.1-flash
+  reasoningEffort: high
+ui-theme:
+  preference: light
+llm-pi-ai:
+  providers: { deepseek: { apiKeyEnv: DEEPSEEK_API_KEY } }
+agent-presets:
+  default: standard

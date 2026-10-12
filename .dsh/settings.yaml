@@ -1,9 +1,11 @@
-# ⚠ 编码模式备忘：本文件及 ~/.dsh 下所有配置文件、.dsh 仓库文件
-# 必须保存为 UTF-8 无 BOM（UTF-8 without BOM）。禁止用 PowerShell
-# Set-Content -Encoding UTF8（会写 BOM），改用 write 工具或
-# [System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($false))。
-# 教训：2026-10-12 曾把 profiles/web/package.json 存成 UTF-8 with BOM，
-# 导致 dsh web 解析 JSON 失败、重启起不来。
+# ⚠ 编码模式备忘（按文件类型区分，别搞混）：
+#   • YAML / JSON 配置（settings.yaml、package.json、cordis.patch.yml）
+#     → 必须 UTF-8 无 BOM。有 BOM 会导致解析失败、dsh web / 桌面版起不来。
+#     禁止 PowerShell Set-Content -Encoding UTF8（会写 BOM），改用 write 工具或
+#     [System.IO.File]::WriteAllText($p, $t, [System.Text.UTF8Encoding]::new($false))
+#   • *.ps1 脚本 → UTF-8 **with BOM**（PowerShell 5.1 才能正确显示中文）
+# 教训：2026-10-12 把 profiles/web/package.json 存成 UTF-8 with BOM，
+#       导致 dsh web 解析 JSON 失败、重启起不来。
 #
 # ⚠ 视觉模型备忘（2026-10-12 实测 api.scnet.cn 网关）：
 #   仅 deepseek-v4.1-flash 支持图片输入（inputModalities: [text, image]）。
