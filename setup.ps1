@@ -101,6 +101,13 @@ if (Test-Path $anonSrc) {
     Write-Host "[OK] 复制: .anonymous-user-id" -ForegroundColor Green
 }
 
+# ---- 2b. Doctor 角色定义（全局 AGENTS.md，DSH 自动加载进所有会话）----
+$agentsSrc = Join-Path $DshSource "AGENTS.md"
+if (Test-Path $agentsSrc) {
+    Copy-Item $agentsSrc (Join-Path $DshTarget "AGENTS.md") -Force
+    Write-Host "[OK] 复制: AGENTS.md（Doctor 角色 + 环境维护手册）" -ForegroundColor Green
+}
+
 # ---- 3. 会话记忆 ----
 $srcSessions = Join-Path $DshSource "sessions"
 if (Test-Path $srcSessions) {

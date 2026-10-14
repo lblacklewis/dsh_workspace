@@ -36,6 +36,15 @@ cd dsh_workspace
    - 复制 `.dsh\.credentials.yaml.example` 为 `~/.dsh/.credentials.yaml`
    - 填入 `DEEPSEEK_API_KEY`（官方）与 `SCNET_API_KEY`（scnet 网关）
 
+## 🩺 Doctor — 环境维护角色
+
+仓库的 `.dsh/AGENTS.md` 定义了 **Doctor** 角色（整体环境维护 / 工具安装 / 故障诊断）。
+`setup.ps1` 会把它部署到 `~/.dsh/AGENTS.md`，**DSH 自动加载进所有会话**（实测支持热更新），
+所以两台机器上的助手都遵守同一套环境规范与踩坑经验。
+
+内容涵盖：环境路径速查、编码规范（无 BOM / with BOM）、模型图片能力、
+上下文上限与自救流程、Web 版与桌面版差异、插件安装约定。
+
 ## 🖥️ 桌面版（DSH Desktop）特别注意
 
 **桌面版 ≠ Web 版**，两者的 profile 与插件体系不同：
