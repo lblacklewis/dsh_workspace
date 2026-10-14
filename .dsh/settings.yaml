@@ -4,15 +4,16 @@
 #     禁止 PowerShell Set-Content -Encoding UTF8（会写 BOM），改用 write 工具或
 #     [System.IO.File]::WriteAllText($p, $t, [System.Text.UTF8Encoding]::new($false))
 #   • *.ps1 脚本 → UTF-8 **with BOM**（PowerShell 5.1 才能正确显示中文）
-# 教训：2026-10-12 把 profiles/web/package.json 存成 UTF-8 with BOM，
-#       导致 dsh web 解析 JSON 失败、重启起不来。
 #
-# ⚠ 视觉模型备忘（2026-10-12 实测 api.scnet.cn 网关）：
-#   仅 deepseek-v4.1-flash 支持图片输入（inputModalities: [text, image]）。
-#   deepseek-v4-flash / deepseek-v4-pro / glm-5.3 / glm-5.3-flash 均为纯文本，
-#   传图会被网关丢弃（模型回"没看到图片"）。模型名已标注，选择时注意。
-ui-onboarding:
-  welcomeNoticeVersion: 2026-08-13.1
+# ⚠ 上下文上限备忘（2026-10-14 实测）：
+#   网关 api.scnet.cn 的真实上限 = 1,048,576 input tokens（litellm pre-call check）。
+#   超限时网关返回 "ContextWindowExceededError"，但常被包装成通用文案
+#   "OpenAIException - Invalid request. Please check the request parameters."，
+#   DSH 认不出 → 不触发自动压缩 → 会话持续 400（死锁，只能开新会话）。
+#   DSH 压缩阈值 = contextWindow × 0.8，故把 contextWindow 从 1000000 下调到
+#   500000（阈值 40 万），比原来提前一倍压缩，避免撞线。
+#   实例：termdeck 会话涨到 9155 条消息 / 8.79MB 后持续 400，只能靠交接文档开新会话。
+#   经验：长会话别贴整段日志、别频繁截图。
 llm-deepseek:
   baseURL: https://api.scnet.cn/api/gw/v1
   apiKeyEnv: SCNET_API_KEY
@@ -22,7 +23,7 @@ llm-deepseek:
       name: DeepSeek-V4.1-Flash 🖼 支持图片
       description: Fast, efficient, and economical; suited to focused, routine, or
         parallel tasks. Supports image input.
-      contextWindow: 1000000
+      contextWindow: 500000
       inputModalities:
         - text
         - image
@@ -31,30 +32,32 @@ llm-deepseek:
       name: DeepSeek-V4-Flash（纯文本）
       description: Fast, efficient, and economical; suited to focused, routine, or
         parallel tasks.
-      contextWindow: 1000000
+      contextWindow: 500000
       inputModalities:
         - text
     - id: deepseek-v4-pro
       name: DeepSeek-V4-Pro（纯文本）
       description: Stronger agentic coding, knowledge, and difficult reasoning; suited
         to complex or quality-critical tasks at higher cost.
-      contextWindow: 1000000
+      contextWindow: 500000
       inputModalities:
         - text
     - id: glm-5.3
       name: GLM-5.3（纯文本）
-      contextWindow: 1000000
+      contextWindow: 500000
       inputModalities:
         - text
     - id: glm-5.3-flash
       name: GLM-5.3-Flash（纯文本）
-      contextWindow: 1000000
+      contextWindow: 500000
       inputModalities:
         - text
     - id: gpt-5.6-terra-plus
       name: gpt-5.6-terra-plus
     - id: gpt-5.6-luna-plus
       name: gpt-5.6-luna-plus
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
 agent-default-model:
   provider: deepseek-official
   model: deepseek-v4.1-flash
