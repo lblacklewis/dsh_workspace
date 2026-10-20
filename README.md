@@ -2,8 +2,8 @@
 
 DSH 配置 + 会话记忆同步仓库（Web 版 / 桌面版通用）。
 
-> 本仓库**只保留配置与记忆**：`.dsh/`（profiles/settings/sessions/storages）、
-> `todo-widget/`（待办悬浮组件插件包）、`docs/`、`.agents/`。
+> 本仓库**只保留配置与记忆**：`.dsh/`（profiles/settings/sessions/storages 与 `AGENTS.md`）、
+> `docs/`、`.agents/`。
 > 工程类项目（termdeck、admin、app、crmeb 等）已移出 git 跟踪，见 `.gitignore`。
 
 ## 🚀 首次部署（在新机器上）

@@ -1,5 +1,0 @@
-# 待办悬浮组件 —— 正式插件包
-# 挂载到 shell.overlay（右下角悬浮层），数据落盘到工作区 .dsh-todos.json
-- insert:
-    - id: todo-widget
-      name: '@local/dsh-todo-widget'
