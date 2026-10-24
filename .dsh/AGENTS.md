@@ -35,11 +35,16 @@
 `[System.IO.File]::WriteAllText($p, $t, [System.Text.UTF8Encoding]::new($false))`。
 > 实例：把 `profiles/web/package.json` 存成 UTF-8 with BOM → `dsh web` 起不来。
 
-### 2. 模型能力（实测 api.scnet.cn，2026-10-14）
+### 2. 模型能力（更新 2026-10-24）
 
-- **仅 `deepseek-v4.1-flash` 支持图片**；`deepseek-v4-flash` / `deepseek-v4-pro` / `glm-*` 传图会被静默丢弃
+- **网关 api.scnet.cn**：仅 `deepseek-v4.1-flash` 支持图片；`deepseek-v4-flash` / `deepseek-v4-pro` / `glm-*` 传图会被静默丢弃（网关侧 glm 保持「纯文本」标注）
+- **本地 `local/glm-5.3-flash-local`**（公司内网 LiteLLM `10.17.95.253:8030`）：**支持图片**
+  （GLM-5.3-Flash 上游官方即视觉模型，settings 已声明 `input: [text, image]`；
+  仅公司内网可达，家里连不上）
 - 判断方法：看响应 `prompt_tokens`——真读图会显著变大（有图 ~238，无图 ~15）
 - 模型名已标注「🖼 支持图片」/「（纯文本）」，**传图前先确认模型**
+- ⚠️ 本地路由 key = `~/.dsh/.credentials.yaml` 的 `LOCAL_API_KEY`（LiteLLM 要求 `sk-` 开头；
+  DSH 只在**启动时**读凭证，credentials 文件改动不热加载——重启后本地模型若 401，先查这个 key）
 
 ### 3. 上下文管理（会话撑爆的教训）
 

@@ -14,10 +14,17 @@
 #   500000（阈值 40 万），比原来提前一倍压缩，避免撞线。
 #   实例：termdeck 会话涨到 9155 条消息 / 8.79MB 后持续 400，只能靠交接文档开新会话。
 #   经验：长会话别贴整段日志、别频繁截图。
+#   • 会话超时：网关（api.scnet.cn）自己的 input-validation 截止时间在**服务端**，本地没有开关。
+#     DSH 这边唯一相关的旋钮是 provider 的 streamIdleTimeoutMs（默认 5 分钟，见
+#     packages/llm/llm-deepseek/src/index.ts:150 "Maximum provider idle time while one
+#     stream read is outstanding"）。2026-10-23 出现 "Gateway input-validation deadline
+#     exceeded" 后把它调到 15 分钟：大请求的**首字节**可能等很久，本地默认 5 分钟会先放弃。
+#     真正治本的是让请求变小（长会话写交接文档后开新会话 / 别把整段日志、大批文件读进上下文）。
 llm-deepseek:
   baseURL: https://api.scnet.cn/api/gw/v1
   apiKeyEnv: SCNET_API_KEY
   reasoningEffort: high
+  streamIdleTimeoutMs: 900000
   models:
     - id: deepseek-v4.1-flash
       name: DeepSeek-V4.1-Flash 🖼 支持图片
@@ -59,9 +66,8 @@ llm-deepseek:
 ui-onboarding:
   welcomeNoticeVersion: 2026-08-13.1
 agent-default-model:
-  provider: deepseek-official
-  model: deepseek-v4.1-flash
-  reasoningEffort: high
+  provider: local
+  model: glm-5.3-flash-local
 skin-custom-theme:
   applied: true
   light:
@@ -85,7 +91,21 @@ remote-web-ui:
   enabled: true
   autoTunnel: true
   lanBind: true
+# 本地推理（公司内网 LiteLLM）：glm-5.3-flash 上游官方即视觉模型（zai 目录
+#   input:[text,image]），2026-10-24 声明 image 并把 requestImagePixelBudget
+#   设为 262144（512×512，对齐 deepseek 的 low 档）。网关的 glm-* 仍是纯文本。
 llm-pi-ai:
-  providers: { deepseek: { apiKeyEnv: DEEPSEEK_API_KEY } }
+  providers:
+    {
+      deepseek: { apiKeyEnv: DEEPSEEK_API_KEY },
+      local:
+        {
+          apiKeyEnv: LOCAL_API_KEY,
+          api: openai-completions,
+          baseURL: http://10.17.95.253:8030/v1,
+          requestImagePixelBudget: 262144,
+          models: [ { id: glm-5.3-flash-local, name: glm-5.3-flash 🖼 支持图片, input: [ text, image ] } ]
+        }
+    }
 agent-presets:
   default: standard
