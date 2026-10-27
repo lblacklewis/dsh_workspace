@@ -1,0 +1,22 @@
+fix: 修复后台登录不了 - Redis requirepass 丢失 + 品牌素材替换
+
+根因:
+- Redis 未配置 requirepass（原密码是运行时 CONFIG SET 设的，重启即丢）
+- 后端 application-dev.yml 配了 password: redis_dMtNMj
+- Jedis 抛 "ERR AUTH <password> called without any password configured"
+- 连接池拿不到连接 → token 无法读写 → 所有鉴权接口返回 401
+- HTTP 状态码却是 200，只有 body 是 {"code":401,...}（恰好 49 字节）
+- 表现：登录按钮点完变灰 + 反复弹「无效的会话」「Verification failed」
+
+修复:
+- requirepass redis_dMtNMj 写入 redis.conf 并重启 redis-server
+- 重启后端清空坏连接池
+- 验证：getAdminInfoByToken 正常返回 / getMenus 12436 字节 13 个菜单
+
+品牌:
+- 新增 docs/brand/logo-storapp.svg（teal 圆角 + 十字 + StorApp 健康药房）
+- 新增 docs/brand/login-bg-storapp.svg（替换 CRMEB「JAVA 商业版」登录背景）
+- 更新 DB 配置 site_logo_* / mobile_login_logo / admin_login_bg_pic
+
+文档:
+- docs/云端部署记录.md 补充 Redis 配置步骤 + 49 字节排查技巧 + 踩坑表
