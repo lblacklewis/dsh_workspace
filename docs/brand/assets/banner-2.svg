@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 320" width="750" height="320">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#0F766E"/>
+    </linearGradient>
+    <radialGradient id="r" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="750" height="320" fill="url(#g)"/>
+  <circle cx="640" cy="60" r="170" fill="url(#r)"/>
+  <circle cx="90" cy="290" r="130" fill="url(#r)"/>
+  <g opacity="0.14" stroke="#FFFFFF" stroke-width="2" fill="none">
+    <circle cx="628" cy="205" r="62"/>
+    <circle cx="628" cy="205" r="96"/>
+  </g>
+  <g opacity="0.9">
+    <rect x="592" y="169" width="72" height="72" rx="20" fill="#FFFFFF" opacity="0.18"/>
+    <rect x="622" y="185" width="12" height="40" rx="4" fill="#FFFFFF"/>
+    <rect x="608" y="199" width="40" height="12" rx="4" fill="#FFFFFF"/>
+  </g>
+  <text x="60" y="128" font-family="Helvetica,Arial,sans-serif" font-size="46" font-weight="700" fill="#FFFFFF">送药到家</text>
+  <text x="60" y="186" font-family="Helvetica,Arial,sans-serif" font-size="26" fill="#FFFFFF" opacity="0.92">最快 30 分钟送达</text>
+  <text x="60" y="232" font-family="Helvetica,Arial,sans-serif" font-size="20" fill="#FFFFFF" opacity="0.72">24 小时营业 · 夜间也可下单</text>
+</svg>
