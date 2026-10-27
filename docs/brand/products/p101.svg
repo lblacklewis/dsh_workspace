@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <defs>
+    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#0D9488"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" fill="#F1F5F9"/>
+  <rect x="170" y="250" width="460" height="320" rx="22" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="3"/>
+  <path d="M170 272a22 22 0 0 1 22-22h416a22 22 0 0 1 22 22v88H170z" fill="url(#h)"/>
+  <text x="400" y="318" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="24" fill="#FFFFFF" opacity="0.9" letter-spacing="6">StorApp 健康药房</text>
+  <rect x="612" y="176" width="96" height="96" rx="14" fill="#0D9488"/>
+  <text x="660" y="238" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">OTC</text>
+  <text x="400" y="428" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="46" font-weight="700" fill="#0F172A">感冒灵颗粒</text>
+  <text x="400" y="478" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="26" fill="#64748B">10袋/盒</text>
+  <rect x="352" y="516" width="96" height="26" rx="13" fill="#E6FFFA"/>
+  <text x="400" y="535" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="16" fill="#0D9488" letter-spacing="2">正品保障</text>
+  <g transform="translate(348,614)">
+    <rect width="104" height="104" rx="26" fill="#E6FFFA"/>
+    <rect x="44" y="24" width="16" height="56" rx="6" fill="#0D9488"/>
+    <rect x="24" y="44" width="56" height="16" rx="6" fill="#0D9488"/>
+  </g>
+</svg>
