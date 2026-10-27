@@ -226,7 +226,7 @@
         "async" : {
             "timeout" : 200000
         },
-        "title" : ""
+        "title" : "StorApp 健康药房"
     },
     "plus" : {
         "statusbar" : {
