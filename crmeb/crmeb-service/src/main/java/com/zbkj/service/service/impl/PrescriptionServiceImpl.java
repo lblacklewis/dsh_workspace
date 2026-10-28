@@ -7,9 +7,11 @@ import com.zbkj.common.exception.CrmebException;
 import com.zbkj.common.model.prescription.Consultation;
 import com.zbkj.common.model.prescription.OrderPrescription;
 import com.zbkj.common.model.prescription.Prescription;
+import com.zbkj.common.model.prescription.PrescriptionCallbackLog;
 import com.zbkj.common.model.product.StoreProduct;
 import com.zbkj.service.dao.ConsultationDao;
 import com.zbkj.service.dao.OrderPrescriptionDao;
+import com.zbkj.service.dao.PrescriptionCallbackLogDao;
 import com.zbkj.service.dao.PrescriptionDao;
 import com.zbkj.service.dao.StoreProductDao;
 import com.zbkj.service.service.PrescriptionService;
@@ -47,6 +49,9 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
 
     @Autowired
     private PrescriptionProviderFactory providerFactory;
+
+    @Autowired
+    private PrescriptionCallbackLogDao prescriptionCallbackLogDao;
 
     @Autowired
     private ConsultationDao consultationDao;
@@ -250,21 +255,32 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
 
     @Override
     public boolean handleCallback(String providerCode, HttpServletRequest request, String rawBody) {
+        PrescriptionCallbackLog logRow = new PrescriptionCallbackLog();
+        logRow.setProvider(providerCode);
+        logRow.setRawBody(truncate(rawBody, 4000));
+        logRow.setHeaders(collectHeaders(request));
+        logRow.setCreateTime(new Date());
+        logRow.setIsParsed(false);
+
         try {
             if (!providerFactory.exists(providerCode)) {
                 log.warn("[Prescription] 回调来自未知平台: {}", providerCode);
+                logRow.setErrMsg("未知平台: " + providerCode);
                 return false;
             }
             PrescriptionProvider provider = providerFactory.get(providerCode);
             if (!provider.verifyCallback(request, rawBody)) {
                 log.warn("[Prescription] 回调验签失败 provider={}", providerCode);
+                logRow.setErrMsg("验签失败");
                 return false;
             }
             Prescription rx = provider.parseCallback(rawBody);
             if (rx == null || rx.getOuterRxNo() == null || rx.getOuterRxNo().isEmpty()) {
                 log.warn("[Prescription] 回调报文解析失败 provider={}", providerCode);
+                logRow.setErrMsg("报文解析失败或缺少处方号");
                 return false;
             }
+            logRow.setOuterRxNo(rx.getOuterRxNo());
             pullFromProvider(providerCode, rx.getOuterRxNo());
 
             // 关联问诊单
@@ -276,11 +292,42 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
                 c.setStatus(2);
                 consultationDao.updateById(c);
             }
+            logRow.setIsParsed(true);
             return true;
         } catch (Exception e) {
             log.error("[Prescription] 回调处理异常 provider={}", providerCode, e);
+            logRow.setErrMsg(truncate(e.getMessage(), 500));
             return false;
+        } finally {
+            // 落日志本身不能影响回调结果 —— 对方重推时不该因为我们日志表写失败而反复重试
+            try {
+                prescriptionCallbackLogDao.insert(logRow);
+            } catch (Exception e) {
+                log.error("[Prescription] 回调日志写入失败 provider={}", providerCode, e);
+            }
         }
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) {
+            return null;
+        }
+        return s.length() <= max ? s : s.substring(0, max);
+    }
+
+    /** 只留排查验签需要的头，避免把整个请求头（可能含 token）落库 */
+    private static String collectHeaders(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String name : new String[]{"Content-Type", "Signature", "sign", "timestamp", "nonce", "User-Agent"}) {
+            String v = request.getHeader(name);
+            if (v != null && !v.isEmpty()) {
+                sb.append(name).append('=').append(v).append("; ");
+            }
+        }
+        return truncate(sb.toString(), 1000);
     }
 
     // ---------- 内部工具 ----------
