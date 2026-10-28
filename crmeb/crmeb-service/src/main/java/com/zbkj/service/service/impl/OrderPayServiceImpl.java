@@ -41,6 +41,8 @@ import com.zbkj.common.utils.RedisUtil;
 import com.zbkj.common.utils.WxPayUtil;
 import com.zbkj.common.vo.*;
 import com.zbkj.service.delete.OrderUtils;
+import com.zbkj.common.model.delivery.DeliveryOrder;
+import com.zbkj.service.service.delivery.dto.DeliveryCreateRequest;
 import com.zbkj.service.service.*;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -80,6 +82,9 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     @Autowired
     private StoreOrderService storeOrderService;
+
+    @Autowired
+    private DeliveryOrderService deliveryOrderService;
 
     @Autowired
     private StoreOrderStatusService storeOrderStatusService;
@@ -389,8 +394,53 @@ public class OrderPayServiceImpl implements OrderPayService {
                 e.printStackTrace();
                 logger.error("短信、模板通知、优惠券或打印小票异常");
             }
+
+            // 同城即时配送：支付成功后自动发单
+            autoDispatchDelivery(storeOrder);
         }
         return execute;
+    }
+
+    /**
+     * 同城即时配送 —— 支付成功后自动发单。
+     *
+     * 这里刻意与支付主流程解耦并整体 try-catch：
+     * 发单失败（无可用运力商、地址异常、运力商超时等）绝不能让已经支付成功的订单
+     * 回滚或抛错，否则用户付了钱却看到"支付失败"。
+     * 失败只记日志，由后台「配送管理」页人工补单。
+     *
+     * shippingType = 3 是同城即时配送（1 快递、2 到店自提）。
+     */
+    private void autoDispatchDelivery(StoreOrder storeOrder) {
+        try {
+            Integer shippingType = storeOrder.getShippingType();
+            if (shippingType == null || shippingType != 3) {
+                return;
+            }
+            if (!deliveryOrderService.isEnabled()) {
+                logger.warn("订单 {} 是同城即时配送，但当前未启用任何运力商，需在后台人工处理", storeOrder.getOrderId());
+                return;
+            }
+            // 幂等：重复支付回调不重复发单
+            DeliveryOrder exist = deliveryOrderService.getByOrderId(storeOrder.getId());
+            if (exist != null) {
+                logger.info("订单 {} 已存在配送单 {}，跳过自动发单", storeOrder.getOrderId(), exist.getOuterNo());
+                return;
+            }
+            DeliveryCreateRequest req = new DeliveryCreateRequest();
+            req.setOrderNo(storeOrder.getOrderId());
+            req.setToName(storeOrder.getRealName());
+            req.setToPhone(storeOrder.getUserPhone());
+            req.setToAddress(storeOrder.getUserAddress());
+            DeliveryOrder deliveryOrder = deliveryOrderService.dispatch(storeOrder.getId(), storeOrder.getOrderId(), req, null);
+            logger.info("订单 {} 同城配送已自动发单：运力商={} 运力单号={}",
+                    storeOrder.getOrderId(),
+                    deliveryOrder == null ? "-" : deliveryOrder.getProvider(),
+                    deliveryOrder == null ? "-" : deliveryOrder.getOuterNo());
+        } catch (Exception e) {
+            logger.error("订单 {} 同城配送自动发单失败，需在后台「配送管理」人工补单：{}",
+                    storeOrder.getOrderId(), e.getMessage(), e);
+        }
     }
 
     // 支持成功拼团后置处理
