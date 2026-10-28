@@ -1,32 +1,47 @@
-/* StorApp H5 覆盖样式
- * 构建产物 index.html 里由 apply-h5-override.ps1 注入到 </head> 前。
- * 原因：这几个问题来自 CRMEB 组件自身，重新构建会被覆盖，必须每次构建后重新注入。
- */
+.page_count .serch-wrapper .input, .page_count .serch-wrapper .uninput {
+  background-color: #E6FFFA !important; color: #0D9488 !important;
+  box-shadow: inset 0 0 0 1px rgba(13,148,136,.18) !important;
+}
+.page_count .serch-wrapper .input .iconfont, .page_count .serch-wrapper .uninput .iconfont,
+.page_count .serch-wrapper .input .line1, .page_count .serch-wrapper .uninput .line1 { color: #0D9488 !important; }
+.page_count .serch-wrapper { padding: 0 10px !important; }
+.page_count .bg-img { display: none !important; }
 
-/* 1. 首页搜索框不可见
- *    CRMEB 的 .input 是「白字 + 40% 透明白底」，原本设计是压在彩色 banner 图上。
- *    本项目布局里搜索框在 banner 上方、落在浅色页面背景 → 完全看不见。
- *    改成与金刚区图标一致的浅 teal 底 + teal 文字。 */
-.page_count .serch-wrapper .input,
-.page_count .serch-wrapper .uninput {
-  background-color: #E6FFFA !important;
-  color: #0D9488 !important;
-  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, 0.18) !important;
+/* 底部导航：uni-app 的 H5 基础样式(static/index.css)没被 index.html 引用，
+   uni-view / uni-image 的默认布局全部退化，flex 排版不可靠。
+   这里用绝对定位把图标和文字钉死，不依赖任何 flex 行为。 */
+.page-footer-fixed {
+  position: fixed !important; left: 0 !important; right: 0 !important;
+  bottom: 0 !important; top: auto !important; width: 100% !important; z-index: 9999 !important;
 }
-.page_count .serch-wrapper .input .iconfont,
-.page_count .serch-wrapper .uninput .iconfont,
-.page_count .serch-wrapper .input .line1,
-.page_count .serch-wrapper .uninput .line1 {
-  color: #0D9488 !important;
+.page-footer-wrapper { display: block !important; width: 100% !important; }
+.page-footer {
+  position: relative !important; display: block !important;
+  width: 100% !important; height: 50px !important; padding: 0 !important;
+  background: #fff !important; box-shadow: 0 -1px 0 rgba(0,0,0,.06) !important;
 }
-.page_count .serch-wrapper {
-  padding: 0 10px !important;
+.page-footer .foot-item {
+  position: relative !important; display: block !important;
+  float: left !important; width: 25% !important; height: 50px !important;
+  padding: 0 !important; margin: 0 !important;
 }
-
-/* 2. 左上角多出一块青色方块
- *    homeComb 的 .bg-img（banner 模糊背景副本）在 H5 下塌缩成 8px 竖条，
- *    里面的 banner 图在左上角露出一条青色。
- *    注意：它是 .page_count 的后代而非直接子元素，选择器不能用 >。 */
-.page_count .bg-img {
-  display: none !important;
+.page-footer::after { content: ""; display: block; clear: both; }
+.page-footer .foot-item uni-image {
+  position: absolute !important; display: block !important;
+  top: 6px !important; left: 50% !important; margin-left: -11px !important;
+  width: 22px !important; height: 22px !important;
+}
+.page-footer .foot-item uni-image > div {
+  position: static !important; display: block !important;
+  width: 22px !important; height: 22px !important;
+  background-size: 22px 22px !important; background-repeat: no-repeat !important;
+  background-position: center !important;
+}
+.page-footer .foot-item .txt {
+  position: absolute !important; display: block !important;
+  left: 0 !important; right: 0 !important; bottom: 6px !important;
+  margin: 0 !important; padding: 0 !important;
+  text-align: center !important;
+  font-size: 11px !important; line-height: 12px !important;
+  white-space: nowrap !important;
 }
