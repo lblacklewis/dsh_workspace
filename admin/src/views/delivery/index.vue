@@ -12,8 +12,8 @@
           style="margin-top: 10px"
         ></el-alert>
       </div>
-      <el-row :gutter="12">
-        <el-col v-for="p in providers" :key="p.code" :span="6" style="margin-bottom: 12px">
+      <div class="pv-grid">
+        <div v-for="p in providers" :key="p.code" class="pv-cell">
           <div class="pv-card" :class="{ 'pv-on': p.isEnable }">
             <div class="pv-head">
               <span class="pv-name">{{ p.name }}</span>
@@ -32,8 +32,8 @@
               {{ p.isEnable ? '停用' : '启用' }}
             </el-button>
           </div>
-        </el-col>
-      </el-row>
+        </div>
+      </div>
     </el-card>
 
     <el-card :bordered="false" shadow="never" class="mt15" :body-style="{ padding: 0 }">
@@ -266,6 +266,16 @@ export default {
 .block-pagination {
   padding: 16px;
   text-align: right;
+}
+.pv-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -6px;
+}
+.pv-cell {
+  box-sizing: border-box;
+  width: 25%;
+  padding: 0 6px 12px;
 }
 .pv-card {
   border: 1px solid #ebeef5;
