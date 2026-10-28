@@ -21,6 +21,7 @@ import Layout from '@/layout';
 import storeRouter from './modules/store';
 import orderRouter from './modules/order';
 import prescriptionRouter from './modules/prescription';
+import deliveryRouter from './modules/delivery';
 import userRouter from './modules/user';
 // import distributionRouter from './modules/distribution';  // 分销：医药不需要
 import marketingRouter from './modules/marketing';
@@ -67,6 +68,8 @@ export const constantRoutes = [
   orderRouter,
   // 处方（医药特有：处方药审核）
   prescriptionRouter,
+  // 配送（同城即时配送）
+  deliveryRouter,
   // 会员
   userRouter,
   // 营销

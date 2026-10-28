@@ -169,7 +169,9 @@ export default {
       this.loading = true;
       prescriptionList(this.tableFrom)
         .then((res) => {
-          this.list = res.data || [];
+          // 注意：request.js 的响应拦截器 return res.data，
+          // 所以这里的 res 已经是业务数据本身，再取 .data 会得到 undefined。
+          this.list = res || [];
         })
         .catch(() => {
           this.list = [];
