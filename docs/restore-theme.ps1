@@ -1,4 +1,4 @@
-# 一键恢复首页装修（把 docs/首页装修_最终版.sql 写回 eb_theme）
+﻿# 一键恢复首页装修（把 docs/首页装修_最终版.sql 写回 eb_theme）
 #
 # 背景：2026-10-27 17:43 首页装修数据被还原成了 CRMEB 默认模板
 #       （eb_theme.home_data 被 home_default_data 覆盖），
@@ -51,8 +51,11 @@ scp -o StrictHostKeyChecking=no $out "${SshHost}:/tmp/restore-theme.sql"
 $remote = @"
 mysql -u$MysqlUser -p$MysqlPass $MysqlDb < /tmp/restore-theme.sql 2>&1 | grep -v 'Using a password'
 # 主题色单独存在 theme_data 里（不是 home_data），改了 home_data 也要同步改它，
-# 否则前端 --view-theme 还是 CRMEB 的红色 #E93323。
-mysql -u$MysqlUser -p$MysqlPass $MysqlDb -e "UPDATE eb_theme SET theme_data = REPLACE(REPLACE(REPLACE(REPLACE(theme_data,'#E93323','#0D9488'),'#FF7931','#14B8A6'),'#FE960F','#0D9488'),'233, 51, 35','13, 148, 136') WHERE id = 1;" 2>&1 | grep -v 'Using a password'
+# 否则前端 --view-theme 还是别的颜色。
+# 注意：这里必须「直接赋值」，不能用「把 #E93323 替换成 #0D9488」的写法 ——
+#       换成主题商城的主题后 theme_data 会是别的颜色（如生鲜主题的 #057748），
+#       替换模式匹配不上就静默失败了。
+mysql -u$MysqlUser -p$MysqlPass $MysqlDb -e "UPDATE eb_theme SET theme_data = '{\"theme_color\":\"#0D9488\",\"gradient_color\":\"#14B8A6\",\"sub_color\":\"#0D9488\",\"light_color\":\"rgba(13, 148, 136, 0.1)\"}', theme_default_data = '{\"theme_color\":\"#0D9488\",\"gradient_color\":\"#14B8A6\",\"sub_color\":\"#0D9488\",\"light_color\":\"rgba(13, 148, 136, 0.1)\"}', title = 'StorApp 健康药房' WHERE id = 1;" 2>&1 | grep -v 'Using a password'
 redis-cli -a $RedisPass --no-auth-warning -n 10 FLUSHDB >/dev/null 2>&1
 redis-cli -a $RedisPass --no-auth-warning -n 0  FLUSHDB >/dev/null 2>&1
 mysql -u$MysqlUser -p$MysqlPass -N -e "SELECT CONCAT('  home ic-cold=',IF(home_data LIKE '%ic-cold%','Y','N'),'  感冒灵=',IF(home_data LIKE '%感冒灵%','Y','N'),'  限时秒杀=',IF(home_data LIKE '%限时秒杀%','Y','N'),'  nav图标=',IF(home_data LIKE '%nav-home-on%','Y','N')) FROM eb_theme WHERE id=1" $MysqlDb 2>/dev/null

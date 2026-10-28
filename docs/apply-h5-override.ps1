@@ -1,4 +1,4 @@
-# 原子化注入 H5 覆盖样式到服务器 /var/www/storapp/h5/index.html
+﻿# 原子化注入 H5 覆盖样式到服务器 /var/www/storapp/h5/index.html
 #
 # ⚠️ 为什么必须原子写：
 #   nginx 用 pread() 读静态文件。如果直接原地覆盖写（open(...,'w') 先截断再写），
