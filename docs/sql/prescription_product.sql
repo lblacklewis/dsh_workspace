@@ -1,0 +1,15 @@
+-- 处方-药品明细：无需新建表
+--
+-- eb_prescription_product 在更早的处方模块里已经建好了，实际结构是：
+--   id, prescription_id, product_id, sku_id, quantity, create_time
+-- 比最初设计的还完整（带规格和数量）。
+--
+-- 踩过的坑：我按自己设想的结构写了 CREATE TABLE IF NOT EXISTS，
+-- 因为表已存在被静默跳过，但实体里多了一个 drug_name 字段，
+-- 运行时报 Unknown column 'drug_name'，而它被全局异常处理包成了
+-- 「服务器数据异常，请联系管理员」—— 完全看不出是列名问题。
+-- 正确做法是让实体去适配已有表，而不是让表去适配实体。
+--
+-- 这里只确保索引存在（幂等）。
+CREATE INDEX idx_rx_product_rx ON eb_prescription_product (prescription_id);
+-- 若上面这条报 Duplicate key name 说明索引已存在，忽略即可。

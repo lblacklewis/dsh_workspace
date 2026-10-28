@@ -7,12 +7,14 @@ import com.zbkj.common.exception.CrmebException;
 import com.zbkj.common.model.prescription.Consultation;
 import com.zbkj.common.model.prescription.OrderPrescription;
 import com.zbkj.common.model.prescription.Prescription;
+import com.zbkj.common.model.prescription.PrescriptionProduct;
 import com.zbkj.common.model.prescription.PrescriptionCallbackLog;
 import com.zbkj.common.model.product.StoreProduct;
 import com.zbkj.service.dao.ConsultationDao;
 import com.zbkj.service.dao.OrderPrescriptionDao;
 import com.zbkj.service.dao.PrescriptionCallbackLogDao;
 import com.zbkj.service.dao.PrescriptionDao;
+import com.zbkj.service.dao.PrescriptionProductDao;
 import com.zbkj.service.dao.StoreProductDao;
 import com.zbkj.service.service.PrescriptionService;
 import com.zbkj.service.service.prescription.PrescriptionProvider;
@@ -29,6 +31,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +56,9 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
 
     @Autowired
     private PrescriptionCallbackLogDao prescriptionCallbackLogDao;
+
+    @Autowired
+    private PrescriptionProductDao prescriptionProductDao;
 
     @Autowired
     private com.zbkj.service.service.crypto.SensitiveDataCrypto sensitiveDataCrypto;
@@ -235,12 +242,54 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
             return rxProducts.stream().map(StoreProduct::getId).collect(Collectors.toList());
         }
 
-        // 3. 目前只校验"有没有有效处方"，不校验处方里是否**恰好包含**这个药。
-        //    严格意义上应该比对 eb_prescription_product，但那需要处方明细录入或对方平台回传明细，
-        //    等合作方接口文档确定后再补。当前实现已能拦住"完全没处方就买处方药"的违规。
-        // TODO(接入合作平台后)：改为按 eb_prescription_product 精确匹配商品
-        log.info("[Prescription] 用户 {} 有 {} 张有效处方，放行 {} 个处方药", uid, valid.size(), rxProducts.size());
-        return Collections.emptyList();
+        // 3. 精确匹配。
+        //
+        //    这里必须区分两类处方，否则会把用户全拦死：
+        //      a) 合作互联网医院回传的处方 —— eb_prescription_product 里有明细，
+        //         按明细精确匹配，处方没开这个药就不让买。
+        //      b) 用户手工上传的处方照片 —— 没有明细，无法精确匹配，
+        //         退回「有有效处方即放行」。
+        //    缺数据是系统能力的欠缺，不该由用户承担后果。
+
+        List<Integer> validRxIds = valid.stream().map(Prescription::getId).collect(Collectors.toList());
+
+        // 有明细的处方：它开了哪些商品
+        List<PrescriptionProduct> details = prescriptionProductDao.selectList(
+                new LambdaQueryWrapper<PrescriptionProduct>().in(PrescriptionProduct::getPrescriptionId, validRxIds));
+
+        Set<Integer> coveredByDetails = details.stream()
+                .map(PrescriptionProduct::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 没有任何明细的处方（手工上传的）——这些处方只能按宽松规则放行
+        Set<Integer> rxIdsWithDetails = details.stream()
+                .map(PrescriptionProduct::getPrescriptionId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        boolean hasPrescriptionWithoutDetails = valid.stream()
+                .anyMatch(p -> !rxIdsWithDetails.contains(p.getId()));
+
+        List<Integer> uncovered = new ArrayList<>();
+        for (StoreProduct p : rxProducts) {
+            if (coveredByDetails.contains(p.getId())) {
+                continue;
+            }
+            if (hasPrescriptionWithoutDetails) {
+                // 有一张没明细的有效处方，按宽松规则放行
+                continue;
+            }
+            uncovered.add(p.getId());
+        }
+
+        if (uncovered.isEmpty()) {
+            log.info("[Prescription] 用户 {} 处方覆盖校验通过：有效处方 {} 张，明细 {} 条",
+                    uid, valid.size(), details.size());
+        } else {
+            log.warn("[Prescription] 用户 {} 有 {} 个处方药不在任何有效处方明细内：{}",
+                    uid, uncovered.size(), uncovered);
+        }
+        return uncovered;
     }
 
     @Override
