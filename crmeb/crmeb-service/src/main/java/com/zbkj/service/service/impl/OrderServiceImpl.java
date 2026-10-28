@@ -1015,7 +1015,10 @@ public class OrderServiceImpl implements OrderService {
         // 校验收货信息
         String verifyCode = "";
         String userAddressStr = "";
-        if (request.getShippingType() == 1) { // 快递配送
+        // 1=快递配送，2=到店自提，3=同城即时配送
+        // 3 和 1 一样都需要收货地址；运费在 computedPrice() 里走 else 分支按运费模板算，
+        // 区别只体现在"支付后派给骑手"而不是"发快递"。因此这里只需要放行 3。
+        if (request.getShippingType() == 1 || request.getShippingType() == 3) {
             if (request.getAddressId() <= 0) throw new CrmebException("请选择收货地址");
             UserAddress userAddress = userAddressService.getById(request.getAddressId());
             if (ObjectUtil.isNull(userAddress) || userAddress.getIsDel()) {
@@ -1039,6 +1042,10 @@ public class OrderServiceImpl implements OrderService {
             }
             verifyCode = CrmebUtil.randomCount(1111111111, 999999999) + "";
             userAddressStr = systemStore.getName();
+        } else {
+            // 兜底：原来没有 else，传了非法 shippingType 会静默通过，
+            // 结果是订单没有收货人却照样创建成功，排查起来很费劲。
+            throw new CrmebException("不支持的配送方式: " + request.getShippingType());
         }
 
         // 活动商品校验

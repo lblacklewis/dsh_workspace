@@ -279,3 +279,26 @@ export function getPayConfig(preOrderNo) {
 export function getOrderPayConfig() {
 	return request.get(`pay/get/config`);
 }
+
+/**
+ * 同城即时配送 —— 是否开启
+ */
+export function getDeliveryEnabled() {
+	return request.get("delivery/enabled");
+}
+
+/**
+ * 同城即时配送 —— 询价
+ * @param object {toName,toPhone,toAddress,toLat,toLng,goodsCount}
+ */
+export function quoteDelivery(data) {
+	return request.post("delivery/quote", data);
+}
+
+/**
+ * 同城即时配送 —— 查询某订单的配送状态
+ * @param int orderId
+ */
+export function getDeliveryStatus(orderId) {
+	return request.get(`delivery/status/${orderId}`);
+}

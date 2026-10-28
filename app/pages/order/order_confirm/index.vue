@@ -51,6 +51,21 @@
 				</view>
 			</view>
 			<view class="pad30">
+				<!-- 同城即时配送：只在快递配送模式下出现（同城配送同样需要收货地址）。
+				     刻意不做成第三个梯形标签——那个梯形是 CSS border 画的，加一个会破坏几何。 -->
+				<view class="wrapper borRadius14" v-if="shippingType == 0 && deliveryEnabled">
+					<view class='item acea-row row-between-wrapper' @tap='toggleInstant'>
+						<view>配送方式</view>
+						<view class='discount acea-row row-middle'>
+							<text :class="isInstant ? 'font_color' : ''">{{ isInstant ? ('同城配送 · 约' + instantEta + '分钟达') : '快递发货' }}</text>
+							<text class='iconfont icon-jiantou'></text>
+						</view>
+					</view>
+					<view class='item acea-row row-between-wrapper' v-if="isInstant">
+						<view>同城配送费</view>
+						<view class='discount font_color'>¥{{ instantFee }}</view>
+					</view>
+				</view>
 				<orderGoods :cartInfo="cartInfo" :orderProNum="orderProNum"></orderGoods>
 				<view class='wrapper borRadius14'>
 					<view class='item acea-row row-between-wrapper' @tap='couponTap'
@@ -157,7 +172,9 @@
 		postOrderComputed,
 		orderPay,
 		wechatQueryPayResult,
-		loadPreOrderApi
+		loadPreOrderApi,
+		getDeliveryEnabled,
+		quoteDelivery
 	} from '@/api/order.js';
 	import {
 		getAddressDetail,
@@ -272,6 +289,13 @@
 				mydata: {},
 				storeList: [],
 				store_self_mention: false,
+				// ---- 同城即时配送 ----
+				// 只在 shippingType==0（快递配送）下可选，因为同城配送同样需要收货地址。
+				// 提交时映射成后端的 3（1快递 2自提 3同城即时配送）。
+				deliveryEnabled: false,   // 后台是否开启了同城配送
+				isInstant: false,         // 用户是否选了同城配送
+				instantFee: '0.00',       // 询价得到的配送费
+				instantEta: 0,            // 预计送达分钟数
 				cartInfo: [],
 				priceGroup: {},
 				animated: false,
@@ -383,6 +407,8 @@
 					this.store_self_mention = res.data.storeSelfMention == '1' && this
 						.productType ===
 						'normal' ? true : false;
+					// 同城配送是否开启：单独查一次，失败就当没开（不能影响结算页渲染）
+					this.getDeliveryEnabled();
 				}).catch(err => {
 					uni.navigateTo({
 						url: '/pages/users/order_list/index'
@@ -421,14 +447,60 @@
 					})
 				}
 			},
+			// 后端 shippingType: 1快递 2自提 3同城即时配送。
+			// 页面上的 shippingType 只区分梯形标签 0/1，同城配送是独立开关 isInstant。
+			apiShippingType: function() {
+				return this.isInstant ? 3 : (parseInt(this.shippingType) + 1);
+			},
+			// 查询后台有没有开启同城配送
+			getDeliveryEnabled: function() {
+				getDeliveryEnabled().then(res => {
+					this.deliveryEnabled = !!(res.data && res.data.enabled);
+				}).catch(() => {
+					this.deliveryEnabled = false;
+				});
+			},
+			// 切换「快递发货 / 同城配送」
+			toggleInstant: function() {
+				this.isInstant = !this.isInstant;
+				if (this.isInstant) {
+					this.quoteInstant();
+				}
+				this.computedPrice();
+			},
+			// 向后台询价：拿配送费和预计送达时间
+			quoteInstant: function() {
+				let addr = this.addressInfo || {};
+				let detail = (addr.province || '') + (addr.city || '') + (addr.district || '') + (addr.detail || '');
+				quoteDelivery({
+					toName: addr.realName || '',
+					toPhone: addr.phone || '',
+					toAddress: detail,
+					goodsCount: this.orderProNum || 1
+				}).then(res => {
+					let d = res.data || {};
+					if (d.success) {
+						this.instantFee = d.fee;
+						this.instantEta = d.estimateMin;
+					} else {
+						// 询价失败就退回快递，避免用户以为能用同城配送却发不出去
+						this.isInstant = false;
+						this.$util.Tips({ title: d.errMsg || '当前地址暂不支持同城配送' });
+						this.computedPrice();
+					}
+				}).catch(() => {
+					this.isInstant = false;
+					this.$util.Tips({ title: '同城配送暂不可用' });
+					this.computedPrice();
+				});
+			},
 			// 计算订单价格
 			computedPrice: function() {
-				let shippingType = this.shippingType;
 				postOrderComputed({
 					addressId: this.addressId,
 					useIntegral: this.useIntegral ? true : false,
 					couponId: this.couponId,
-					shippingType: parseInt(shippingType) + 1,
+					shippingType: this.apiShippingType(),
 					preOrderNo: this.preOrderNo
 				}).then(res => {
 					let data = res.data;
@@ -453,6 +525,10 @@
 			addressType: function(e) {
 				let index = e;
 				this.shippingType = parseInt(index);
+				// 切到门店自提时同城配送必然失效（自提不需要骑手）
+				if (parseInt(index) === 1) {
+					this.isInstant = false;
+				}
 				this.computedPrice();
 				//调起获取定位信息
 				if (index == 1) {
@@ -648,7 +724,7 @@
 					preOrderNo: that.preOrderNo,
 					mark: that.mark,
 					storeId: that.system_store.id || 0,
-					shippingType: that.$util.$h.Add(that.shippingType, 1),
+					shippingType: that.apiShippingType(),
 				};
 				// #ifdef MP
 				openPaySubscribe().then(() => {
