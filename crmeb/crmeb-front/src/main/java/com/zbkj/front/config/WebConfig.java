@@ -114,6 +114,11 @@ public class WebConfig implements WebMvcConfigurer {
 
                 excludePathPatterns("/api/front/splash/ad/info").
 
+                // 运力商回调：服务端对服务端调用，没有用户 token。
+                // 安全性由 DeliveryProvider.verifyCallback() 的签名校验保证，
+                // **不是**由登录态保证。漏了这条会导致线上一单都发不出去。
+                excludePathPatterns("/api/front/delivery/callback/**").
+
                 excludePathPatterns("/swagger-resources/**", "/webjars/**", "/v2/**", "/swagger-ui.html/**");
     }
 
