@@ -197,6 +197,9 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private StorePinkService storePinkService;
 
+    @Autowired
+    private com.zbkj.service.service.pay.PaymentAvailability paymentAvailability;
+
     /**
      * 发送后台管理员下单提醒通知短信
      *
@@ -943,7 +946,11 @@ public class OrderServiceImpl implements OrderService {
         OrderInfoVo orderInfoVo = JSONObject.parseObject(orderVoString, OrderInfoVo.class);
         PreOrderResponse preOrderResponse = new PreOrderResponse();
         preOrderResponse.setOrderInfoVo(orderInfoVo);
-        String payWeixinOpen = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_PAY_WEIXIN_OPEN);
+        // 不能只看开关：凭证是占位值时前端不该展示该支付方式。
+        // 统一走 PaymentAvailability，与 getPayConfig() / OrderUtils.checkPayType() 保持一致。
+        String payWeixinOpen = payFlag(paymentAvailability.wechatPayAvailable());
+        String aliPayStatus = payFlag(paymentAvailability.aliPayAvailable());
+        String yuePayStatus = payFlag(paymentAvailability.yuePayAvailable());
         if (orderInfoVo.getIsVideo()) {
             // 关闭余额支付和到店自提
             preOrderResponse.setYuePayStatus("0");
@@ -952,14 +959,17 @@ public class OrderServiceImpl implements OrderService {
             preOrderResponse.setAliPayStatus("0");
             return preOrderResponse;
         }
-        String yuePayStatus = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_YUE_PAY_STATUS);// 1开启 2关闭
         String storeSelfMention = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_KEY_STORE_SELF_MENTION);
-        String aliPayStatus = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_ALI_PAY_STATUS);// 1开启
         preOrderResponse.setYuePayStatus(yuePayStatus);
         preOrderResponse.setPayWeixinOpen(payWeixinOpen);
         preOrderResponse.setStoreSelfMention(storeSelfMention);
         preOrderResponse.setAliPayStatus(aliPayStatus);
         return preOrderResponse;
+    }
+
+    /** 布尔转 CRMEB 惯用的 "1"/"0" 开关值 */
+    private static String payFlag(boolean on) {
+        return on ? "1" : "0";
     }
 
     /**
@@ -1302,14 +1312,12 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public PreOrderResponse getPayConfig() {
         PreOrderResponse preOrderResponse = new PreOrderResponse();
-        String payWeixinOpen = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_PAY_WEIXIN_OPEN);
-        String yuePayStatus = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_YUE_PAY_STATUS);// 1开启 2关闭
         String storeSelfMention = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_KEY_STORE_SELF_MENTION);
-        String aliPayStatus = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_ALI_PAY_STATUS);// 1开启
-        preOrderResponse.setYuePayStatus(yuePayStatus);
-        preOrderResponse.setPayWeixinOpen(payWeixinOpen);
+        // 同 loadPreOrder：只看开关会把未配置凭证的支付方式当成可用
+        preOrderResponse.setYuePayStatus(payFlag(paymentAvailability.yuePayAvailable()));
+        preOrderResponse.setPayWeixinOpen(payFlag(paymentAvailability.wechatPayAvailable()));
         preOrderResponse.setStoreSelfMention(storeSelfMention);
-        preOrderResponse.setAliPayStatus(aliPayStatus);
+        preOrderResponse.setAliPayStatus(payFlag(paymentAvailability.aliPayAvailable()));
         return preOrderResponse;
     }
 

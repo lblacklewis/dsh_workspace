@@ -190,19 +190,22 @@ public class OrderPayServiceImpl implements OrderPayService {
     @Autowired
     private AsyncService asyncService;
 
+    @Autowired
+    private com.zbkj.service.service.pay.PaymentAvailability paymentAvailability;
+
     /**
      * 获取支付配置
      */
     @Override
     public PayConfigResponse getPayConfig() {
-        String payWxOpen = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_PAY_WEIXIN_OPEN);
-        String yuePayStatus = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_YUE_PAY_STATUS);
-        String aliPayStatus = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_ALI_PAY_STATUS);
+        // 注意：不能只看开关值。本项目初始化时凭证是占位值（111/111111）而开关是开的，
+        // 若只看开关，前端会把「微信支付」「支付宝」当成可用选项展示，用户点了必然失败。
+        // 统一走 PaymentAvailability：开关打开 **且** 凭证是真实值才算可用。
         PayConfigResponse response = new PayConfigResponse();
-        response.setYuePayStatus(Constants.CONFIG_FORM_SWITCH_OPEN.equals(yuePayStatus));
-        response.setPayWechatOpen(Constants.CONFIG_FORM_SWITCH_OPEN.equals(payWxOpen));
-        response.setAliPayStatus(Constants.CONFIG_FORM_SWITCH_OPEN.equals(aliPayStatus));
-        if (Constants.CONFIG_FORM_SWITCH_OPEN.equals(yuePayStatus)) {
+        response.setYuePayStatus(paymentAvailability.yuePayAvailable());
+        response.setPayWechatOpen(paymentAvailability.wechatPayAvailable());
+        response.setAliPayStatus(paymentAvailability.aliPayAvailable());
+        if (paymentAvailability.yuePayAvailable()) {
             User user = userService.getInfo();
             response.setUserBalance(user.getNowMoney());
         }

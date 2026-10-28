@@ -43,6 +43,9 @@ public class OrderUtils {
     @Autowired
     private StoreOrderInfoService storeOrderInfoService;
 
+    @Autowired
+    private com.zbkj.service.service.pay.PaymentAvailability paymentAvailability;
+
     /**
      * 检测支付渠道
      * @param payChannel 支付渠道
@@ -60,6 +63,9 @@ public class OrderUtils {
 
     /**
      * 检查支付类型
+     *
+     * 注意：不能只看开关。开关开着但凭证是占位值时，前端不会展示该支付方式，
+     * 这里也必须一致地拦掉，否则会出现"前端没这个选项、后端却允许"的缝隙。
      * @param payType 支付类型标识
      * @return 是否支持
      */
@@ -68,13 +74,13 @@ public class OrderUtils {
         payType = payType.toLowerCase();
         switch (payType){
             case PayConstants.PAY_TYPE_WE_CHAT:
-                result = systemConfigService.getValueByKey(SysConfigConstants.CONFIG_PAY_WEIXIN_OPEN).equals("1");
+                result = paymentAvailability.wechatPayAvailable();
                 break;
             case PayConstants.PAY_TYPE_YUE:
-                result = (systemConfigService.getValueByKey(SysConfigConstants.CONFIG_YUE_PAY_STATUS).equals("1"));
+                result = paymentAvailability.yuePayAvailable();
                 break;
             case PayConstants.PAY_TYPE_ALI_PAY:
-                result = (systemConfigService.getValueByKey(SysConfigConstants.CONFIG_ALI_PAY_STATUS).equals("1"));
+                result = paymentAvailability.aliPayAvailable();
                 break;
         }
         return result;
