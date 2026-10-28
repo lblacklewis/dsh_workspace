@@ -48,6 +48,29 @@
 						</view>
 					</view>
 				</view>
+				<!-- 同城即时配送：骑手实时状态。仅已付款的同城单展示。 -->
+				<view v-if="orderInfo.shippingType == 3 && orderInfo.paid" class="rideCard borRadius14">
+					<view class="rideHead">
+						<text class="rideTitle">同城配送</text>
+						<text class="rideStatus" :class="deliveryInfo ? 'on' : ''">
+							{{ deliveryInfo ? deliveryInfo.statusDesc : '正在为你安排骑手…' }}
+						</text>
+					</view>
+					<view v-if="deliveryInfo && deliveryInfo.riderName" class="rideRow">
+						<text class="rideLabel">骑手</text>
+						<text class="rideValue">{{ deliveryInfo.riderName }}</text>
+						<text v-if="deliveryInfo.riderPhone" class="rideCall" @tap="callRider">联系骑手</text>
+					</view>
+					<view v-if="deliveryInfo && deliveryInfo.estimateMin" class="rideRow">
+						<text class="rideLabel">预计送达</text>
+						<text class="rideValue">约 {{ deliveryInfo.estimateMin }} 分钟</text>
+					</view>
+					<view v-if="deliveryInfo && deliveryInfo.failReason" class="rideRow">
+						<text class="rideLabel">异常</text>
+						<text class="rideValue red">{{ deliveryInfo.failReason }}</text>
+					</view>
+					<view class="rideTip">{{ deliveryTip }}</view>
+				</view>
 				<view v-if="orderInfo.shippingType == 2 && orderInfo.paid && orderInfo.pinkStatus != 1" class="writeOff borRadius14">
 					<view class="title">核销信息</view>
 					<view class="grayBg">
@@ -285,7 +308,8 @@
 		orderTake,
 		orderDel,
 		orderCancel,
-		qrcodeApi
+		qrcodeApi,
+		getDeliveryStatus
 	} from '@/api/order.js';
 	import {
 		getCombinationPink
@@ -312,6 +336,10 @@
 				codeImg: '',
 				qrcodeSize: 100,
 				order_id: '',
+			// 同城即时配送骑手状态
+			deliveryInfo: null,
+			deliveryTip: '',
+			deliveryTimer: null,
 				evaluate: 0,
 				cartInfo: [], //购物车产品
 				orderInfo: {
@@ -391,12 +419,16 @@
 				this.getOrderInfo();
 				this.payMode[1].number = this.userInfo.nowMoney;
 				this.$set(this, 'payMode', this.payMode);
+				// 回到页面时恢复骑手状态轮询（订单信息是异步来的，轮询内部会再判断一次条件）
+				this.startDeliveryPolling();
 			} else {
 				toLogin();
 			}
 		},
 		onHide: function() {
 			this.isClose = true;
+			// 页面隐藏后必须停掉轮询，否则会在后台一直发请求
+			this.stopDeliveryPolling();
 		},
 		onReady: function() {
 			// #ifdef H5
@@ -417,6 +449,53 @@
 			// #endif
 		},
 		methods: {
+		// ---------- 同城即时配送骑手状态 ----------
+		// 只在「已付款 + 同城配送 + 未到终态」时轮询，避免无谓请求。
+		// 接口按 orderId 取配送单，没有配送单（未发单/无运力商）时给兜底文案。
+		loadDelivery() {
+			if (!this.order_id) return;
+			if (Number(this.orderInfo.shippingType) !== 3 || !this.orderInfo.paid) return;
+			getDeliveryStatus(this.order_id).then(res => {
+				const d = res.data || null;
+				this.deliveryInfo = d;
+				if (!d) {
+					this.deliveryTip = '商家正在为你安排骑手，请稍候';
+				} else if (d.status === 5) {
+					this.deliveryTip = '骑手已送达，请查收';
+					this.stopDeliveryPolling();
+				} else if (d.status === 6) {
+					this.deliveryTip = '配送已取消，如有疑问请联系商家';
+					this.stopDeliveryPolling();
+				} else if (d.status === 7) {
+					this.deliveryTip = '配送出现异常，商家会尽快处理';
+					this.stopDeliveryPolling();
+				} else if (d.riderName) {
+					this.deliveryTip = '骑手正在赶来，请保持电话畅通';
+				} else {
+					this.deliveryTip = '正在等待骑手接单…';
+				}
+			}).catch(() => {
+				// 配送查询失败不该影响订单详情本身，静默处理
+			});
+		},
+		startDeliveryPolling() {
+			this.stopDeliveryPolling();
+			this.loadDelivery();
+			// 60 秒一次：骑手状态变化不需要秒级，避免给服务端和运力商造成无谓压力
+			this.deliveryTimer = setInterval(() => this.loadDelivery(), 60000);
+		},
+		stopDeliveryPolling() {
+			if (this.deliveryTimer) {
+				clearInterval(this.deliveryTimer);
+				this.deliveryTimer = null;
+			}
+		},
+		callRider() {
+			if (this.deliveryInfo && this.deliveryInfo.riderPhone) {
+				uni.makePhoneCall({ phoneNumber: String(this.deliveryInfo.riderPhone) });
+			}
+		},
+
 			wxChatService(){
 				let chatUrlArr = this.chatUrl.split('?')
 				uni.navigateTo({
@@ -1137,4 +1216,37 @@
 			padding: 30rpx 24rpx;
 		}
 	}
+	/* 同城即时配送骑手状态卡片 */
+	.rideCard {
+		margin: 20rpx 20rpx 0;
+		padding: 26rpx 24rpx;
+		background: #fff;
+		border-radius: 14rpx;
+	}
+	.rideHead {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 18rpx;
+	}
+	.rideTitle { font-size: 28rpx; font-weight: 600; color: #333; }
+	.rideStatus { font-size: 26rpx; color: #999; }
+	.rideStatus.on { color: #0D9488; font-weight: 600; }
+	.rideRow {
+		display: flex;
+		align-items: center;
+		margin-bottom: 12rpx;
+		font-size: 26rpx;
+	}
+	.rideLabel { width: 140rpx; color: #999; }
+	.rideValue { flex: 1; color: #333; }
+	.rideValue.red { color: #e93323; }
+	.rideCall {
+		font-size: 24rpx;
+		color: #0D9488;
+		border: 1rpx solid #0D9488;
+		border-radius: 26rpx;
+		padding: 4rpx 20rpx;
+	}
+	.rideTip { margin-top: 10rpx; font-size: 24rpx; color: #999; }
 </style>
