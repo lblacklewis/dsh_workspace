@@ -1,0 +1,275 @@
+/* ============================================================
+ * StorApp H5 — 首页视觉层（清爽医疗风）
+ *
+ * 这一层只管「好看」，删掉页面依然能用；
+ * 功能性的修复在 h5-override.css，两层都由 apply-h5-override.ps1 注入。
+ *
+ * 设计基调：白底大留白 + 医药青，卡片圆角 + 极淡阴影，信息层级靠字重和灰度拉开。
+ * 参考：京东健康 / 阿里健康。刻意不用高饱和促销色，卖药场景要的是「可信」。
+ *
+ * 注意：CRMEB 的组件样式是 scoped 的（.cls[data-v-xxx]），
+ *       特异性比裸类名高，所以这里基本都要 !important。
+ * ============================================================ */
+
+:root {
+  /* 主色：医药青 */
+  --sa-primary: #0D9488;
+  --sa-primary-d: #0F766E;
+  --sa-primary-l: #CCFBF1;
+  --sa-primary-bg: #F0FDFA;
+
+  /* 中性色：用石板灰而不是纯灰，更「高级」 */
+  --sa-bg: #F5F7FA;
+  --sa-card: #FFFFFF;
+  --sa-t1: #0F172A;
+  --sa-t2: #475569;
+  --sa-t3: #94A3B8;
+  --sa-line: #EDF1F5;
+
+  /* 圆角体系 */
+  --sa-r: 14px;
+  --sa-r-sm: 10px;
+  --sa-r-pill: 999px;
+
+  /* 阴影体系：两层叠加比单层大模糊更自然 */
+  --sa-sh: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px -16px rgba(15, 23, 42, .20);
+  --sa-sh-sm: 0 1px 2px rgba(15, 23, 42, .05), 0 4px 12px -8px rgba(15, 23, 42, .16);
+}
+
+/* ---------- 1. 页面底色与字体 ---------- */
+.page,
+.page-design,
+.uni-page-body {
+  background: var(--sa-bg) !important;
+}
+.page-design {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+               "Helvetica Neue", "Microsoft YaHei", sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 2. 顶部搜索区 ---------- */
+.page_count {
+  background: var(--sa-bg) !important;
+  padding-bottom: 4px !important;
+}
+.page_count .serch-wrapper {
+  padding: 10px 14px 12px !important;
+}
+/* 药丸形搜索框：白底 + 细边 + 极淡阴影，比原来的浅绿底更像成熟电商 */
+.page_count .serch-wrapper .input,
+.page_count .serch-wrapper .uninput {
+  height: 40px !important;
+  line-height: 40px !important;
+  border-radius: var(--sa-r-pill) !important;
+  background: var(--sa-card) !important;
+  border: 1px solid var(--sa-line) !important;
+  box-shadow: var(--sa-sh-sm) !important;
+  color: var(--sa-t2) !important;
+  padding-left: 16px !important;
+  box-sizing: border-box !important;
+}
+.page_count .serch-wrapper .input .iconfont,
+.page_count .serch-wrapper .uninput .iconfont {
+  color: var(--sa-primary) !important;
+  font-size: 17px !important;
+}
+.page_count .serch-wrapper .input .line1,
+.page_count .serch-wrapper .uninput .line1 {
+  color: var(--sa-t3) !important;
+  font-size: 13px !important;
+}
+/* 顶部导航（首页/新品/社群…）：字号收敛、间距加大 */
+.page_count .navTabBox .tabNav .longItem .title,
+.page_count .navTabBox .tabNav .longItem text {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: var(--sa-t1) !important;
+}
+.page_count .navTabBox .tabNav .longItem.on .title,
+.page_count .navTabBox .tabNav .longItem.on text {
+  color: var(--sa-t1) !important;
+}
+
+/* 轮播：圆角 + 左右留白，脱离「通栏大图」的老式做法 */
+.page_count .page_swiper,
+.page_count .swiper,
+.page_count .swiperBg {
+  border-radius: var(--sa-r) !important;
+  overflow: hidden !important;
+  margin: 0 14px !important;
+  box-shadow: var(--sa-sh) !important;
+}
+.page_count .slide-image,
+.page_count .slide-image uni-image,
+.page_count .slide-image img {
+  border-radius: var(--sa-r) !important;
+}
+/* 轮播指示器：短横线式，比圆点更现代 */
+.page_count .dots .dot,
+.page_count .dots .dot1 {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: var(--sa-r-pill) !important;
+  background: rgba(255, 255, 255, .55) !important;
+  margin: 0 3px !important;
+}
+.page_count .dots .dot.on,
+.page_count .dots .dot1.on,
+.page_count .dots .dot.active,
+.page_count .dots .dot1.active {
+  width: 16px !important;
+  background: #fff !important;
+}
+
+/* ---------- 3. 金刚区：独立白卡 ---------- */
+.menu {
+  background: var(--sa-card) !important;
+  border-radius: var(--sa-r) !important;
+  box-shadow: var(--sa-sh) !important;
+  margin: 4px 14px 12px !important;
+  padding: 16px 6px 12px !important;
+  box-sizing: border-box !important;
+}
+.menu .grid-item {
+  padding: 0 0 12px !important;
+}
+/* 10 个金刚区图标：4 列会排成 4+4+2（最后一行空一半），改成 5 列正好 2 行。
+ * .menu 本身是 display:grid，.grid-four 只负责列数，覆盖列定义即可。 */
+.menu.grid-four {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+/* 图标底色：浅青圆角方块，让线性图标有「承载」而不是飘在白底上 */
+.menu .grid-item .pictrue {
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 14px !important;
+  background: var(--sa-primary-bg) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto 7px !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+.menu .grid-item .pictrue uni-image,
+.menu .grid-item .pictrue uni-image div,
+.menu .grid-item .pictrue img {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 0 !important;
+}
+.menu .grid-item .fs-24,
+.menu .grid-item text {
+  font-size: 11px !important;
+  color: var(--sa-t2) !important;
+  letter-spacing: .2px !important;
+}
+
+/* ---------- 4. 商品卡片：全站统一 ---------- */
+/* 用 :where() 压特异性，方便一条规则覆盖商品选项卡和商品列表两处 */
+.list .item-box,
+.goodList .item-box,
+.wf-item {
+  background: var(--sa-card) !important;
+  border-radius: var(--sa-r) !important;
+  box-shadow: var(--sa-sh) !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+/* 图片区：浅灰底，让白底药盒有边界感 */
+.item-box .pictrue,
+.wf-item .pictrue {
+  background: #FBFCFD !important;
+  border-radius: var(--sa-r) var(--sa-r) 0 0 !important;
+  overflow: hidden !important;
+}
+.item-box .pictrue uni-image,
+.item-box .pictrue img {
+  border-radius: var(--sa-r) var(--sa-r) 0 0 !important;
+}
+/* 药名：行高收紧，两行截断 */
+.item-box .info_box .text,
+.wf-item .info_box .text {
+  font-size: 13px !important;
+  line-height: 18px !important;
+  color: var(--sa-t1) !important;
+  font-weight: 500 !important;
+}
+/* 价格：主色 + 半粗，符号和数字对齐 */
+.item-box .info_box .money,
+.wf-item .info_box .money,
+.base-money {
+  color: var(--sa-primary) !important;
+  font-weight: 700 !important;
+  font-family: -apple-system, "SF Pro Display", "DIN Alternate", sans-serif !important;
+}
+.base-money .symbol { font-size: 11px !important; }
+.base-money .integer { font-size: 17px !important; }
+.base-money .decimal { font-size: 11px !important; }
+/* 加购按钮：实心主色圆钮 */
+.item-box .cart-btn,
+.wf-item .cart-btn,
+.joinCart .cart-btn {
+  background: var(--sa-primary) !important;
+  color: #fff !important;
+  border-radius: var(--sa-r-pill) !important;
+  box-shadow: 0 2px 8px -2px rgba(13, 148, 136, .45) !important;
+}
+.item-box .cart-btn .iconfont,
+.wf-item .cart-btn .iconfont {
+  color: #fff !important;
+}
+
+/* ---------- 5. 分区标题（富文本 / 选项卡） ---------- */
+/* CRMEB 的富文本是裸露文字，这里补一条居中的细线标题样式 */
+.index > uni-view > uni-view > .text,
+.index-product-wrapper .item .txt {
+  color: var(--sa-t1) !important;
+  font-weight: 600 !important;
+}
+.index-product-wrapper .nav-bd .item,
+.index-product-wrapper .nav-bd-box .item {
+  border-radius: var(--sa-r-pill) !important;
+  padding: 5px 14px !important;
+  font-size: 13px !important;
+  color: var(--sa-t2) !important;
+  background: transparent !important;
+}
+.index-product-wrapper .nav-bd .item.on,
+.index-product-wrapper .nav-bd-box .item.on {
+  background: var(--sa-primary-bg) !important;
+  color: var(--sa-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* ---------- 6. 底部导航：加顶部分割线，果断去掉阴影 ---------- */
+.page-footer {
+  height: 54px !important;
+  box-shadow: 0 -1px 0 var(--sa-line) !important;
+}
+.page-footer .foot-item {
+  height: 54px !important;
+}
+.page-footer .foot-item uni-image {
+  top: 8px !important;
+  width: 23px !important;
+  height: 23px !important;
+  margin-left: -11.5px !important;
+}
+.page-footer .foot-item .txt {
+  bottom: 7px !important;
+  font-size: 11px !important;
+  letter-spacing: .2px !important;
+}
+.page-footer .foot-item .txt.active {
+  font-weight: 600 !important;
+}
+/* 底部导航图片保持 23px，别被金刚区的 26px 规则串到 */
+.page-footer .foot-item uni-image div {
+  background-size: 23px 23px !important;
+}
+
+/* ---------- 7. 兜底：圆角 / 阴影的通用值 ---------- */
+.rd-24rpx { border-radius: var(--sa-r-pill) !important; }
+.skeleton-radius, .looming-gray { background: #F1F5F9 !important; }

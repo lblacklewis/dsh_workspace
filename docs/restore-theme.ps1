@@ -33,7 +33,10 @@ foreach ($mark in @("ic-cold", "banner-1", "感冒灵")) {
   if ($json -notmatch [regex]::Escape($mark)) { throw "备份内容异常：缺少标记 $mark" }
 }
 if ($json -match "限时秒杀") { throw "备份内容异常：仍是 CRMEB 默认模板" }
-Write-Host "本地校验通过：$($json.Length) 字符，含医药版图标 / banner / 药品商品"
+# 必须同时写 home_default_data，否则后台点一次「恢复默认」就会把装修覆盖回去
+# （2026-10-27 17:43 那次事故就是这个机制，2026-10-28 15:15 又复现了一次）
+if ($sql -notmatch "home_default_data") { throw "SQL 异常：没有同时写 home_default_data，点「恢复默认」会再次被覆盖" }
+Write-Host "本地校验通过：$($json.Length) 字符，含医药版图标 / banner / 药品商品（home_data + home_default_data 同时写）"
 
 if (-not $Apply) {
   Write-Host ""
