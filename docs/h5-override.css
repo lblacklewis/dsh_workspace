@@ -1,47 +1,88 @@
-.page_count .serch-wrapper .input, .page_count .serch-wrapper .uninput {
-  background-color: #E6FFFA !important; color: #0D9488 !important;
-  box-shadow: inset 0 0 0 1px rgba(13,148,136,.18) !important;
+/* ============================================================
+ * StorApp H5 覆盖样式
+ * 由 docs/apply-h5-override.ps1 原子注入到服务器 index.html 的 head 结束标签之前
+ *
+ * 背景：uni-app 的 H5 基础样式 static/index.css(96KB) 没有被构建产物 index.html
+ *       引用（index.html 里 link 数量为 0，业务样式全靠 webpack 内联注入），
+ *       导致 uni-view / uni-image 的默认布局退化。
+ * 注意：不要直接 link 那份 index.css —— 它与当前构建不自洽。
+ * ============================================================ */
+
+/* 1. 首页搜索框：CRMEB 是白字 + 40% 透明白底，落在浅色背景上完全看不见 */
+.page_count .serch-wrapper .input,
+.page_count .serch-wrapper .uninput {
+  background-color: #E6FFFA !important;
+  color: #0D9488 !important;
+  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, .18) !important;
 }
-.page_count .serch-wrapper .input .iconfont, .page_count .serch-wrapper .uninput .iconfont,
-.page_count .serch-wrapper .input .line1, .page_count .serch-wrapper .uninput .line1 { color: #0D9488 !important; }
+.page_count .serch-wrapper .input .iconfont,
+.page_count .serch-wrapper .uninput .iconfont,
+.page_count .serch-wrapper .input .line1,
+.page_count .serch-wrapper .uninput .line1 {
+  color: #0D9488 !important;
+}
 .page_count .serch-wrapper { padding: 0 10px !important; }
+
+/* 2. banner 的模糊背景副本塌缩成 8px 竖条，左上角露出一块青色 */
 .page_count .bg-img { display: none !important; }
 
-/* 底部导航：uni-app 的 H5 基础样式(static/index.css)没被 index.html 引用，
-   uni-view / uni-image 的默认布局全部退化，flex 排版不可靠。
-   这里用绝对定位把图标和文字钉死，不依赖任何 flex 行为。 */
+/* 3. 底部导航
+ *    CRMEB 在 pages/index/index.vue 调 uni.hideTabBar() 隐藏了原生 tabBar，
+ *    底部改由自研 components/pageFooter 组件渲染，DOM 是
+ *      .page-footer-fixed > .page-footer-wrapper > .page-footer > .foot-item
+ *    缺基础样式时四处塌陷：
+ *      a) uni-view 退化成 display:inline                    -> 包裹层宽度 0
+ *      b) .page-footer 是 position:absolute                 -> 父层没高度，整条高度 0
+ *      c) uni-image 内部的 div 高度 0                       -> 图标不显示
+ *      d) scoped 里写 .foot-item image，实际 DOM 是 uni-image -> 尺寸失效、图标压字
+ *    flex 在缺基础样式时不可靠，这里用绝对定位钉死。 */
 .page-footer-fixed {
-  position: fixed !important; left: 0 !important; right: 0 !important;
-  bottom: 0 !important; top: auto !important; width: 100% !important; z-index: 9999 !important;
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  width: 100% !important;
+  z-index: 9999 !important;
 }
 .page-footer-wrapper { display: block !important; width: 100% !important; }
 .page-footer {
-  position: relative !important; display: block !important;
-  width: 100% !important; height: 50px !important; padding: 0 !important;
-  background: #fff !important; box-shadow: 0 -1px 0 rgba(0,0,0,.06) !important;
-}
-.page-footer .foot-item {
-  position: relative !important; display: block !important;
-  float: left !important; width: 25% !important; height: 50px !important;
-  padding: 0 !important; margin: 0 !important;
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  height: 50px !important;
+  padding: 0 !important;
+  background: #fff !important;
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, .06) !important;
 }
 .page-footer::after { content: ""; display: block; clear: both; }
+.page-footer .foot-item {
+  position: relative !important;
+  display: block !important;
+  float: left !important;
+  width: 25% !important;
+  height: 50px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
 .page-footer .foot-item uni-image {
-  position: absolute !important; display: block !important;
-  top: 6px !important; left: 50% !important; margin-left: -11px !important;
-  width: 22px !important; height: 22px !important;
+  position: absolute !important;
+  top: 6px !important;
+  left: 50% !important;
+  margin-left: -11px !important;
+  width: 22px !important;
+  height: 22px !important;
 }
-.page-footer .foot-item uni-image > div {
-  position: static !important; display: block !important;
-  width: 22px !important; height: 22px !important;
-  background-size: 22px 22px !important; background-repeat: no-repeat !important;
-  background-position: center !important;
-}
+.page-footer .foot-item uni-image div { width: 100% !important; height: 100% !important; }
 .page-footer .foot-item .txt {
-  position: absolute !important; display: block !important;
-  left: 0 !important; right: 0 !important; bottom: 6px !important;
-  margin: 0 !important; padding: 0 !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
   text-align: center !important;
-  font-size: 11px !important; line-height: 12px !important;
+  font-size: 11px !important;
+  line-height: 12px !important;
   white-space: nowrap !important;
 }
