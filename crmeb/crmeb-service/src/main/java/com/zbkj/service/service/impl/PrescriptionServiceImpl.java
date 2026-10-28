@@ -231,13 +231,7 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
         }
 
         // 2. 取出该用户所有"已审核通过 + 未过期"的处方
-        Date now = new Date();
-        List<Prescription> valid = list(new LambdaQueryWrapper<Prescription>()
-                .eq(Prescription::getUid, uid)
-                .eq(Prescription::getAuditStatus, 1)
-                .eq(Prescription::getStatus, 1)
-                .eq(Prescription::getIsDel, false)
-                .and(w -> w.isNull(Prescription::getValidEnd).or().ge(Prescription::getValidEnd, now)));
+        List<Prescription> valid = listValidPrescriptions(uid);
         if (valid.isEmpty()) {
             return rxProducts.stream().map(StoreProduct::getId).collect(Collectors.toList());
         }
@@ -290,6 +284,22 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
                     uid, uncovered.size(), uncovered);
         }
         return uncovered;
+    }
+
+    @Override
+    public boolean hasValidPrescription(Integer uid) {
+        return !listValidPrescriptions(uid).isEmpty();
+    }
+
+    /** 「已审核通过 + 未过期」的处方。两处校验共用，避免条件写岔。 */
+    private List<Prescription> listValidPrescriptions(Integer uid) {
+        Date now = new Date();
+        return list(new LambdaQueryWrapper<Prescription>()
+                .eq(Prescription::getUid, uid)
+                .eq(Prescription::getAuditStatus, 1)
+                .eq(Prescription::getStatus, 1)
+                .eq(Prescription::getIsDel, false)
+                .and(w -> w.isNull(Prescription::getValidEnd).or().ge(Prescription::getValidEnd, now)));
     }
 
     @Override

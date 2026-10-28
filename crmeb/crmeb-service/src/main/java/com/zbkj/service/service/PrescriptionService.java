@@ -37,6 +37,14 @@ public interface PrescriptionService extends IService<Prescription> {
      */
     List<Integer> checkRxProductsCovered(Integer uid, List<Integer> rxProductIds);
 
+    /**
+     * 该用户是否有「已审核通过且在有效期内」的处方。
+     *
+     * 只用于把拦截提示语说清楚：有处方但没开这个药，和压根没处方，
+     * 对用户来说是完全不同的两件事，提示语不能混为一谈。
+     */
+    boolean hasValidPrescription(Integer uid);
+
     /** 订单绑定处方（合规留痕） */
     void bindToOrder(Integer orderId, List<Integer> prescriptionIds);
 

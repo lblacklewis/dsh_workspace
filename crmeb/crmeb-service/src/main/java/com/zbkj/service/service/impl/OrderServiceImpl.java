@@ -1370,8 +1370,24 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             // 取名字失败不能影响拦截本身 —— 拦住才是重点
         }
-        throw new CrmebException("购物车含处方药" + (names.isEmpty() ? "" : "（" + names + "）")
-                + "，请先在「我的处方」上传处方并经执业药师审核通过后再下单");
+        // 提示语必须区分两种情况：
+        //   - 压根没有有效处方 -> 引导去上传
+        //   - 有处方但没开这个药 -> 让用户找医生补开或换药，说"请先上传处方"是误导
+        // 这个区分很要紧：第二种情况下用户明明已经传过处方也审核通过了，
+        // 再让他"去上传处方"只会让他反复传同一张，问题永远解决不了。
+        boolean hasValid = false;
+        try {
+            hasValid = prescriptionService.hasValidPrescription(user.getUid());
+        } catch (Exception e) {
+            // 判断失败时退回更保守的通用文案，不影响拦截本身
+            logger.error("[Order] 查询用户有效处方失败 uid={}", user.getUid(), e);
+        }
+
+        String goodsPart = names.isEmpty() ? "" : "（" + names + "）";
+        String tip = hasValid
+                ? "，你已有的处方未包含该药品，请联系开方医生补开或更换药品后再下单"
+                : "，请先在「我的处方」上传处方并经执业药师审核通过后再下单";
+        throw new CrmebException("购物车含处方药" + goodsPart + tip);
     }
 
     /**
