@@ -944,6 +944,23 @@
 					"navigationBarTitleText": "CRMEB"
 				}
 			}]
+		},
+		{
+			"root": "pages/prescription",
+			"name": "prescription",
+			"pages": [{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "我的处方"
+					}
+				},
+				{
+					"path": "upload",
+					"style": {
+						"navigationBarTitleText": "上传处方"
+					}
+				}
+			]
 		}
 		// #endif 
 	],
