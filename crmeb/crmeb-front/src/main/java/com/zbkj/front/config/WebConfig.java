@@ -119,6 +119,9 @@ public class WebConfig implements WebMvcConfigurer {
                 // **不是**由登录态保证。漏了这条会导致线上一单都发不出去。
                 excludePathPatterns("/api/front/delivery/callback/**").
 
+                // 处方平台回调：同上传力商回调，靠签名验签而不是登录态
+                excludePathPatterns("/api/front/prescription/callback/**").
+
                 excludePathPatterns("/swagger-resources/**", "/webjars/**", "/v2/**", "/swagger-ui.html/**");
     }
 
