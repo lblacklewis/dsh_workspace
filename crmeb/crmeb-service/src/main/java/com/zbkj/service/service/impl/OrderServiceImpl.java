@@ -200,6 +200,9 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private com.zbkj.service.service.pay.PaymentAvailability paymentAvailability;
 
+    @Autowired
+    private com.zbkj.service.service.PrescriptionService prescriptionService;
+
     /**
      * 发送后台管理员下单提醒通知短信
      *
@@ -1022,6 +1025,9 @@ public class OrderServiceImpl implements OrderService {
         // 校验商品库存
         List<MyRecord> skuRecordList = validateProductStock(orderInfoVo, user);
 
+        // 处方药「先方后药」合规闸门
+        validateRxProducts(orderInfoVo, user);
+
         // 校验收货信息
         String verifyCode = "";
         String userAddressStr = "";
@@ -1192,7 +1198,10 @@ public class OrderServiceImpl implements OrderService {
 //        storeOrder.setPayType(request.getPayType());
         storeOrder.setUseIntegral(computedOrderPriceResponse.getUsedIntegral());
         storeOrder.setGainIntegral(gainIntegral);
-        storeOrder.setMark(StringEscapeUtils.escapeHtml4(request.getMark()));
+        // mark 列是 NOT NULL 且无默认值：request.getMark() 为 null 时（小程序/第三方调用方省略该字段）
+        // escapeHtml4(null) 返回 null，INSERT 会直接报 "Field 'mark' doesn't have a default value"，
+        // 而它被全局异常处理包成"服务器数据异常，请联系管理员"，排查时毫无线索。这里兜成空串。
+        storeOrder.setMark(StringEscapeUtils.escapeHtml4(StrUtil.blankToDefault(request.getMark(), "")));
         storeOrder.setCombinationId(orderInfoVo.getCombinationId());
         storeOrder.setPinkId(orderInfoVo.getPinkId());
         storeOrder.setSeckillId(orderInfoVo.getSeckillId());
@@ -1319,6 +1328,50 @@ public class OrderServiceImpl implements OrderService {
         preOrderResponse.setStoreSelfMention(storeSelfMention);
         preOrderResponse.setAliPayStatus(payFlag(paymentAvailability.aliPayAvailable()));
         return preOrderResponse;
+    }
+
+    /**
+     * 处方药「先方后药」合规闸门
+     *
+     * 依据《药品管理法》《互联网药品信息服务管理办法》：处方药必须凭执业医师处方销售，
+     * 且**必须先有处方、通过药师审核，才能下单**。绝不能做成"先付款后补方"。
+     *
+     * 这里是服务端的硬闸门 —— 前端不接、直接调接口也绕不过去。
+     * 用户看到明确报错是刻意设计：合规优先于转化率。
+     *
+     * 拦截时机在 preOrder（生成订单前），所以在支付之前就挡住了，不会产生待付款订单。
+     */
+    private void validateRxProducts(OrderInfoVo orderInfoVo, User user) {
+        if (orderInfoVo == null || CollUtil.isEmpty(orderInfoVo.getOrderDetailList())) {
+            return;
+        }
+        List<Integer> productIds = orderInfoVo.getOrderDetailList().stream()
+                .map(OrderInfoDetailVo::getProductId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (productIds.isEmpty()) {
+            return;
+        }
+        List<Integer> missing = prescriptionService.checkRxProductsCovered(user.getUid(), productIds);
+        if (CollUtil.isEmpty(missing)) {
+            return;
+        }
+        // 把商品名带进提示，否则用户不知道是哪件商品缺处方
+        String names = "";
+        try {
+            List<StoreProduct> products = storeProductService.getListInIds(missing);
+            if (CollUtil.isNotEmpty(products)) {
+                names = products.stream()
+                        .map(StoreProduct::getStoreName)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.joining("、"));
+            }
+        } catch (Exception e) {
+            // 取名字失败不能影响拦截本身 —— 拦住才是重点
+        }
+        throw new CrmebException("购物车含处方药" + (names.isEmpty() ? "" : "（" + names + "）")
+                + "，请先在「我的处方」上传处方并经执业药师审核通过后再下单");
     }
 
     /**
