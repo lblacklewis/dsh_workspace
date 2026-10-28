@@ -1,40 +1,7 @@
 <template>
   <div class="divBox">
-    <!-- 运力商状态：一眼看清哪家开着，避免"配置开了但发单必然失败" -->
-    <el-card :bordered="false" shadow="never" class="ivu-mt" :body-style="{ padding: '16px 20px' }">
-      <div slot="header" class="clearfix">
-        <span style="font-weight: 600">运力商</span>
-        <el-alert
-          type="warning"
-          :closable="false"
-          show-icon
-          title="未接入的运力商即使启用也无法真正发单；凭证到位后再启用"
-          style="margin-top: 10px"
-        ></el-alert>
-      </div>
-      <div class="pv-grid">
-        <div v-for="p in providers" :key="p.code" class="pv-cell">
-          <div class="pv-card" :class="{ 'pv-on': p.isEnable }">
-            <div class="pv-head">
-              <span class="pv-name">{{ p.name }}</span>
-              <el-tag size="mini" :type="p.isEnable ? 'success' : 'info'">
-                {{ p.isEnable ? '已启用' : '未启用' }}
-              </el-tag>
-            </div>
-            <div class="pv-code">code: {{ p.code }}</div>
-            <div class="pv-remark">{{ p.remark || '-' }}</div>
-            <el-button
-              size="mini"
-              :type="p.isEnable ? 'danger' : 'primary'"
-              plain
-              @click="toggleProvider(p)"
-            >
-              {{ p.isEnable ? '停用' : '启用' }}
-            </el-button>
-          </div>
-        </div>
-      </div>
-    </el-card>
+    <!-- 运力商状态：抽成子组件，让它自己持有并渲染数据 -->
+    <provider-cards @changed="getList" />
 
     <el-card :bordered="false" shadow="never" class="mt15" :body-style="{ padding: 0 }">
       <div class="padding-add">
@@ -117,9 +84,8 @@
 </template>
 
 <script>
+import ProviderCards from './components/ProviderCards';
 import {
-  deliveryProviderList,
-  deliveryProviderToggle,
   deliveryList,
   deliveryInfo,
   deliveryDispatch,
@@ -128,11 +94,11 @@ import {
 
 export default {
   name: 'DeliveryOrder',
+  components: { ProviderCards },
   data() {
     return {
       loading: false,
       dispatching: false,
-      providers: [],
       list: [],
       tableFrom: { status: 1, limit: 50 },
       dispatchOrderId: '',
@@ -151,32 +117,9 @@ export default {
     };
   },
   mounted() {
-    this.getProviders();
     this.getList();
   },
   methods: {
-    getProviders() {
-      deliveryProviderList()
-        .then((res) => {
-          this.providers = res || [];
-        })
-        .catch(() => {
-          this.providers = [];
-        });
-    },
-    toggleProvider(p) {
-      const enable = !p.isEnable;
-      this.$confirm(`确定要${enable ? '启用' : '停用'}「${p.name}」吗？`, '提示', { type: 'warning' })
-        .then(() => {
-          deliveryProviderToggle({ code: p.code, enable })
-            .then(() => {
-              this.$message.success('操作成功');
-              this.getProviders();
-            })
-            .catch((err) => this.$message.error(err.msg || '操作失败'));
-        })
-        .catch(() => {});
-    },
     getList() {
       this.loading = true;
       deliveryList(this.tableFrom)
