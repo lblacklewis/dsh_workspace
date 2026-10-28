@@ -54,6 +54,9 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
     private PrescriptionCallbackLogDao prescriptionCallbackLogDao;
 
     @Autowired
+    private com.zbkj.service.service.crypto.SensitiveDataCrypto sensitiveDataCrypto;
+
+    @Autowired
     private ConsultationDao consultationDao;
 
     @Autowired
@@ -81,7 +84,7 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
                 .setProvider("")
                 .setOuterRxNo("")
                 .setPatientName(patientName.trim())
-                .setPatientIdcard(idcard.trim())
+                .setPatientIdcard(sensitiveDataCrypto.encrypt(idcard.trim()))
                 .setImages(images)
                 .setDiagnosis(diagnosis == null ? "" : diagnosis)
                 .setDoctorName("")
@@ -178,16 +181,32 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
         if (auditStatus != null) {
             w.eq(Prescription::getAuditStatus, auditStatus);
         }
-        return list(w);
+        return maskIdcards(list(w));
     }
 
     @Override
     public List<Prescription> listForAudit(Integer auditStatus, Integer limit) {
-        return list(new LambdaQueryWrapper<Prescription>()
+        return maskIdcards(list(new LambdaQueryWrapper<Prescription>()
                 .eq(Prescription::getAuditStatus, auditStatus == null ? 0 : auditStatus)
                 .eq(Prescription::getIsDel, false)
                 .orderByAsc(Prescription::getId)
-                .last("limit " + (limit == null || limit <= 0 ? 20 : limit)));
+                .last("limit " + (limit == null || limit <= 0 ? 20 : limit))));
+    }
+
+    /**
+     * 出参一律脱敏：身份证号明文只在库里（密文）和我们自己的解密逻辑里存在，
+     * 绝不能顺着接口流到前端或后台页面。需要明文核验时走专门的高权限通道。
+     */
+    private List<Prescription> maskIdcards(List<Prescription> list) {
+        if (list == null || list.isEmpty()) {
+            return list;
+        }
+        for (Prescription p : list) {
+            if (p != null) {
+                p.setPatientIdcard(sensitiveDataCrypto.maskIdcard(sensitiveDataCrypto.decrypt(p.getPatientIdcard())));
+            }
+        }
+        return list;
     }
 
     @Override
