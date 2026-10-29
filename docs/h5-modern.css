@@ -364,3 +364,33 @@
 .foot-item {
   transition: color 0.2s ease;
 }
+/* --- 金刚区：图标放大、描边加重，格子更透气 --- */
+/* uni-app H5 把 <image> 编译成 <uni-image><div style="background-image">，
+   所以必须同时打 uni-image 和内层 div，只写 img/image 是不生效的（已踩）。 */
+.grid-item uni-image,
+.grid-item uni-image > div,
+.grid-item .uni-image,
+.grid-item .uni-image > div,
+.grid-item image,
+.grid-item img {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  background-size: 34px 34px !important;
+}
+/* 图标的圆形浅底由 SVG 自带，这里只保证容器不变形 */
+.grid-item uni-image {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.grid-item {
+  padding: 18rpx 0 !important;
+}
+
+/* --- 搜索框：与下方内容对齐，去掉不必要的外扩 --- */
+.uni-input-wrapper,
+.uni-input-placeholder {
+  font-size: 27rpx !important;
+}
