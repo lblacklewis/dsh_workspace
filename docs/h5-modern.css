@@ -273,3 +273,94 @@
 /* ---------- 7. 兜底：圆角 / 阴影的通用值 ---------- */
 .rd-24rpx { border-radius: var(--sa-r-pill) !important; }
 .skeleton-radius, .looming-gray { background: #F1F5F9 !important; }
+
+/* ============================================================
+   第十八轮 polish —— 让 demo 看起来像"现在的东西"
+   只做视觉层，不动装修 JSON（home_data 有被后台覆盖的历史陷阱）
+   ============================================================ */
+
+/* --- 商品图统一：白底 + 圆角 + 内边距，让实拍图和插画看起来是一套 --- */
+.item-box img,
+.item img,
+.wf-item img,
+.goodList img,
+.list img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  background: #fff !important;
+  border-radius: 12px !important;
+  padding: 6px !important;
+  box-sizing: border-box !important;
+}
+
+/* 商品图容器统一比例，避免图片高矮不齐撑乱网格 */
+.item-box,
+.wf-item,
+.goodList .item {
+  background: #fff !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.06) !important;
+}
+
+/* --- 价格：主色 + 加大字重，这是最影响"像不像正经商城"的一处 --- */
+.item-box .price,
+.wf-item .price,
+.goodList .price {
+  color: #e8503a !important;
+  font-size: 30rpx !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.5rpx;
+}
+
+/* --- 商品名：两行截断，避免长短不一撑破卡片 --- */
+.item-box .name,
+.wf-item .name,
+.goodList .name,
+.item .name {
+  font-size: 26rpx !important;
+  line-height: 1.4 !important;
+  color: #1f2937 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+/* --- 分区标题：左侧主色条，比纯文字更有层次 --- */
+.title {
+  padding-left: 20rpx !important;
+  border-left: 6rpx solid #0D9488 !important;
+  font-size: 32rpx !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+  line-height: 1.2 !important;
+}
+
+/* --- 金刚区：图标加浅色圆底，比裸图标更精致 --- */
+.grid-item .iconfont,
+.grid-item image,
+.grid-item img {
+  border-radius: 50% !important;
+}
+.grid-item {
+  padding: 16rpx 0 !important;
+}
+
+/* --- 顶部快捷入口 --- */
+.slide-navigator {
+  border-radius: 14px !important;
+}
+
+/* --- 长条商品位（热销区那种横排大卡）--- */
+.longItem {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.06) !important;
+}
+
+/* --- 底部导航：加一点浮起感 --- */
+.foot-item {
+  transition: color 0.2s ease;
+}
