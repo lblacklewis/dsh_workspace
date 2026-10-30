@@ -394,3 +394,444 @@
 .uni-input-placeholder {
   font-size: 27rpx !important;
 }
+
+/* ============================================================
+   第十九轮 — 「毛坯房」改造：优先级 1 服务保障条 + 优先级 2 底色卡片化
+   ------------------------------------------------------------
+   改这一层前必须先摸清真实 DOM（用 docs/cdp.js 现场量，别靠猜）：
+     uni-page-body                       bg #f8fafc
+       .page_count   390x288  y=0        搜索 + 顶部 tab + 轮播（自带 bag-gradient）
+       #id1772508227561000/001  y=288    金刚区（.menu 已在上面卡片化）
+       #id1772508227561007    y=536      商品选项卡，内含 3 层包裹
+       #id1772508227561008    y=1770     富文本
+       #id1772508227561009    y=1827     商品列表(.goodList)
+   关键发现：「毛坯房」的真凶是这三个装修模块各有 **一层内联样式** 的包裹层，
+   写死了 background: rgb(245,245,245) —— 内联样式只能靠 !important 压，
+   而且区块之间只有 5px 间隙、没有卡片边界，所以整页看起来是「灰白拼贴」。
+   解法：杀掉那层灰 + 让每个模块变成浮在浅青灰底上的白色圆角卡片。
+   ⚠️ 模块 id 是 home_data 生成的雪花 id，会变，禁止写死；只用结构选择器。
+   ============================================================ */
+
+/* ---------- 8-1. 页面底色：冷调浅青灰，比原来的 #f8fafc 更有质感也更压得住白卡 ----------
+   ⚠️ 关键：uni-page-body 里第一层是 `.page.noRepeat.ysize`，它自己带
+   **内联** background-color: rgb(245,245,245)（CRMEB 的 noRepeat/ysize 类给的），
+   内联样式不吃普通选择器，必须 !important。下面这些选择器都写到 (0,3,0) 以上，
+   保证压得住带 [data-v-xxx] 的 scoped 规则（叠加 !important 后按文档顺序，
+   我们的样式被 bump 脚本重排到 head 末尾，所以同类规则我们能赢）。 */
+.page.ysize,
+.page-design.ysize,
+.page-design,
+.page.noRepeat,
+.page-design.noRepeat,
+uni-page-body,
+uni-page-wrapper,
+uni-page,
+uni-app {
+  background-color: #EEF2F5 !important;
+  background-image: none !important;
+}
+uni-page-body {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+/* 首页那圈浅色渐变在这套配色下只会让首屏发灰，去掉。
+   ⚠️ 实测：CRMEB 真正的渐变不在 .bag-gradient（那个是 div），而在
+   `.page_count > uni-view > uni-view` 这一层的**内联** background，
+   写成 linear-gradient(90deg, ${theme}1A, ${theme}14, ${theme}0D, ...)
+   —— 极低透明度的主题色叠在浅底上就是「一块脏掉的青色」。 */
+.page_count .bag-gradient {
+  background-image: none !important;
+}
+.page_count > uni-view > uni-view {
+  background-image: none !important;
+}
+
+/* ---------- 8-6. 顶部导航（首页/热销药品/…）白色文字在浅底上完全看不见 ----------
+   CRMEB 这行 tab 的文字写死 #fff，只为「深色头图」设计；首页装修把商品选项卡的
+   分区名填了进来，留在头上既不可读也没意义。
+   ⚠️ 实测 DOM：.longItem 不是 .tabNav 的直接子节点，中间隔了
+   .longTab > uni-scroll-view > .uni-scroll-view > .uni-scroll-view > .uni-scroll-view-content，
+   所以必须用后代选择器（写成 .tabNav .longItem），用 > 会一条都匹配不上。 */
+.page_count .navTabBox .longItem,
+.page_count .navTabBox .longItem .uni-text,
+.page_count .navTabBox .longItem span,
+.page_count .navTabBox .longItem uni-text {
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+/* 只保留「首页」这一个 tab，做成当前页签的样子（主色下划线 + 深色字） */
+.page_count .navTabBox .longItem.click,
+.page_count .navTabBox .longItem.click .uni-text,
+.page_count .navTabBox .longItem.click span,
+.page_count .navTabBox .longItem:first-child,
+.page_count .navTabBox .longItem:first-child .uni-text,
+.page_count .navTabBox .longItem:first-child span {
+  color: #0F172A !important;
+  font-size: 15px !important;
+  line-height: 42px !important;
+  font-weight: 600 !important;
+}
+.page_count .navTabBox .longItem.click,
+.page_count .navTabBox .longItem:first-child {
+  border-bottom: 2px solid #0D9488 !important;
+}
+/* 首屏（搜索 + 顶部 tab + 轮播）不套卡片：它自带视觉重量，套卡反而局促。
+   .page / .page-design 是**整页容器**，最容易被下面的通用卡片规则误伤，单独排除。 */
+.page,
+.page-design,
+.page_count,
+.pb-safe {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  overflow: visible !important;
+}
+.page,
+.page-design {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ---------- 8-2. 杀掉装修模块里的内联灰底包裹层 ----------
+   CRMEB 给每个装修组件包了一模一样的 3 层结构，其中带 style 属性的那层
+   写死了 background: rgb(245,245,245)。内联样式只能靠 !important 压。
+   注意 .page / .page-design 也带 style（CSS 变量 + 底色），所以必须用
+   :not(.page):not(.page-design) 把整页容器挡在外面 —— 否则整页会被压成白卡。 */
+.page-design.ysize > uni-view > uni-view[style]:not(.page):not(.page-design),
+.page-design.ysize > uni-view > uni-view > uni-view[style]:not(.page):not(.page-design),
+.page-design.ysize > uni-view > uni-view > uni-view > uni-view[style]:not(.page):not(.page-design) {
+  background-color: transparent !important;
+  background-image: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+/* ---------- 8-3. 模块卡片化：装修模块 = 一张浮起的白卡 ----------
+   .page-design 的直接子节点就是装修模块（金刚区 / 商品选项卡 / 富文本 / 商品列表）。 */
+.page-design.ysize > uni-view {
+  background-color: #fff !important;
+  border-radius: 16px !important;
+  margin: 0 12px 10px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 28px -20px rgba(15, 23, 42, .28) !important;
+}
+/* 首屏模块不套卡片（放 8-1 之后是因为要压过上面这条同特异性规则） */
+.page-design.ysize > .page_count,
+.page-design.ysize > .pb-safe,
+.page-design.ysize > .page {
+  background-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+/* 模块之间拉开距离：现在 5px，看着像「糊在一起」 */
+.page-design.ysize > uni-view + uni-view {
+  margin-top: 10px !important;
+}
+
+/* ---------- 8-4. 卡片内让商品图铺满，去掉嵌套圆角打架 ---------- */
+.page-design.ysize .pictrue {
+  border-radius: 0 !important;
+}
+.page-design.ysize .richText {
+  border-radius: 0 !important;
+  background-color: #fff !important;
+}
+/* 富文本标题「为你推荐」：颜色收敛到正文色 */
+.richText .text,
+.richText uni-view {
+  color: #0F172A !important;
+}
+
+/* ---------- 8-5. 商品选项卡标题栏：卡片顶部的「头部」区 ---------- */
+.index-product-wrapper .nav-bd,
+.index-product-wrapper .nav-bd-box {
+  padding: 4px 0 8px !important;
+  background: #fff !important;
+}
+
+/* ---------- 8-6. 商品卡：在白卡里再加一层「微卡」，边界更清楚 ---------- */
+.wf-item {
+  box-shadow: 0 0 0 1px #EFF3F7, 0 6px 16px -14px rgba(15, 23, 42, .30) !important;
+}
+
+/* ============================================================
+   9. 优先级 1：服务保障条（DOM 由 docs/h5-inject.js 运行时注入）
+   位置：轮播下方、金刚区上方。医药场景买的是「信任」，这条是转化关键。
+   删掉 h5-inject.js 即可整条消失，样式留着不报错。
+   ============================================================ */
+#sa-trustbar {
+  margin: 10px 12px !important;
+  padding: 12px 6px !important;
+  background: linear-gradient(180deg, #F7FEFD 0%, #FFFFFF 62%) !important;
+  border: 1px solid rgba(13, 148, 136, .14) !important;
+  border-radius: 16px !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 28px -20px rgba(13, 148, 136, .45) !important;
+}
+#sa-trustbar .sa-trustbar-inner {
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: space-between !important;
+}
+#sa-trustbar .sa-trustbar-item {
+  position: relative !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 2px !important;
+  box-sizing: border-box !important;
+}
+/* 竖分隔线：最后一项不加，比四格均分更有「条」的感觉 */
+#sa-trustbar .sa-trustbar-item + .sa-trustbar-item::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 6px !important;
+  bottom: 6px !important;
+  width: 1px !important;
+  background: linear-gradient(180deg, rgba(13, 148, 136, 0) 0%, rgba(13, 148, 136, .22) 50%, rgba(13, 148, 136, 0) 100%) !important;
+}
+#sa-trustbar .sa-trustbar-ic {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 9px !important;
+  background: #F0FDFA !important;
+  color: #0D9488 !important;
+  margin-bottom: 5px !important;
+}
+#sa-trustbar .sa-trustbar-ic svg {
+  width: 17px !important;
+  height: 17px !important;
+  display: block !important;
+}
+#sa-trustbar .sa-trustbar-tx {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  line-height: 1.25 !important;
+  min-width: 0 !important;
+}
+#sa-trustbar .sa-trustbar-tx b {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #0F172A !important;
+  white-space: nowrap !important;
+}
+#sa-trustbar .sa-trustbar-tx i {
+  font-style: normal !important;
+  font-size: 9px !important;
+  color: #94A3B8 !important;
+  white-space: nowrap !important;
+  transform: scale(.96) !important;
+  margin-top: 1px !important;
+}
+
+/* ============================================================
+   10. 第二十轮重绘 —— 商品卡角标
+   DOM 由 docs/h5-inject.js 的 decorateCards() 注入（.sa-tags）。
+   ⚠️ 只标「处方药 / OTC / 器械」这类**合规属性**，不造任何促销标签。
+   ============================================================ */
+.sa-tags {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 4px !important;
+  margin: 0 0 5px !important;
+  height: 16px !important;
+  overflow: hidden !important;
+}
+.sa-tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 15px !important;
+  padding: 0 5px !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  line-height: 15px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  letter-spacing: .2px !important;
+}
+/* 处方药：红底白字，医疗场景里必须一眼可辨 */
+.sa-tag--rx {
+  background: #E11D48 !important;
+  color: #fff !important;
+}
+/* OTC：主色描边款，比实心轻，不抢价格 */
+.sa-tag--otc {
+  background: #F0FDFA !important;
+  color: #0F766E !important;
+  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, .35) !important;
+}
+/* 配送承诺：中性灰，弱化 */
+.sa-tag--ship {
+  background: #F1F5F9 !important;
+  color: #64748B !important;
+}
+
+/* ============================================================
+   11. 第二十轮重绘 —— 分区标题 + 查看全部
+   ============================================================ */
+.sa-panel-more {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 1px !important;
+  font-size: 12px !important;
+  color: #94A3B8 !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+.sa-panel-more svg {
+  width: 13px !important;
+  height: 13px !important;
+  display: block !important;
+}
+/* 「为你推荐」那行是富文本自带的「—— 标题 ——」装饰，
+   把「查看全部」绝对定位到右侧，不破坏原来的居中标题。 */
+.sa-panel-more--inline {
+  position: absolute !important;
+  right: 15px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+/* ============================================================
+   12. 第二十轮重绘 —— 健康科普区（#sa-knowledge）
+   DOM 由 docs/h5-inject.js 的 placeKnowledge() 注入。
+   位置：商品列表之后。目的是把页面从「只有商品」变成有内容密度。
+   ⚠️ 文案是通用用药常识（不是诊疗建议），且带免责声明。
+   ============================================================ */
+#sa-knowledge {
+  background: #fff !important;
+  border-radius: 16px !important;
+  margin: 10px 12px !important;
+  padding: 16px 14px 12px !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 28px -20px rgba(15, 23, 42, .28) !important;
+}
+#sa-knowledge .sa-panel-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 10px !important;
+}
+#sa-knowledge .sa-panel-title {
+  position: relative !important;
+  padding-left: 12px !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #0F172A !important;
+}
+#sa-knowledge .sa-panel-title::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 4px !important;
+  height: 15px !important;
+  border-radius: 2px !important;
+  background: #0D9488 !important;
+}
+#sa-knowledge .sa-know-list {
+  display: flex !important;
+  flex-direction: column !important;
+}
+#sa-knowledge .sa-know-item {
+  display: flex !important;
+  align-items: flex-start !important;
+  padding: 11px 0 !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid #F1F5F9 !important;
+}
+#sa-knowledge .sa-know-item:last-child {
+  border-bottom: none !important;
+}
+#sa-knowledge .sa-know-ic {
+  flex: 0 0 auto !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 11px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-right: 10px !important;
+}
+#sa-knowledge .sa-know-ic svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+}
+#sa-knowledge .sa-know-ic.is-teal {
+  background: #F0FDFA !important;
+  color: #0D9488 !important;
+}
+#sa-knowledge .sa-know-ic.is-blue {
+  background: #EFF6FF !important;
+  color: #3B82F6 !important;
+}
+#sa-knowledge .sa-know-ic.is-rose {
+  background: #FFF1F2 !important;
+  color: #E11D48 !important;
+}
+#sa-knowledge .sa-know-tx {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+#sa-knowledge .sa-know-tx b {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #0F172A !important;
+  line-height: 19px !important;
+}
+#sa-knowledge .sa-know-tx i {
+  font-style: normal !important;
+  font-size: 12px !important;
+  color: #64748B !important;
+  line-height: 17px !important;
+  margin-top: 2px !important;
+  /* 两行截断，避免长短不一撑破卡片 */
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+#sa-knowledge .sa-know-tags {
+  display: flex !important;
+  gap: 5px !important;
+  margin-top: 6px !important;
+}
+#sa-knowledge .sa-know-tags em {
+  font-style: normal !important;
+  font-size: 10px !important;
+  line-height: 16px !important;
+  height: 16px !important;
+  padding: 0 6px !important;
+  border-radius: 4px !important;
+  background: #F1F5F9 !important;
+  color: #64748B !important;
+}
+#sa-knowledge .sa-disclaimer {
+  margin: 10px 0 0 !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  background: #F8FAFC !important;
+  font-size: 10px !important;
+  line-height: 15px !important;
+  color: #94A3B8 !important;
+}

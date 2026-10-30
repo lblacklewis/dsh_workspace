@@ -38,7 +38,7 @@ import java.util.List;
 @Slf4j
 @Service
 public class DeliveryOrderServiceImpl extends ServiceImpl<DeliveryOrderDao, DeliveryOrder>
-        implements DeliveryOrderService {
+        implements DeliveryOrderService, org.springframework.beans.factory.InitializingBean {
 
     @Autowired
     private DeliveryProviderFactory providerFactory;
@@ -54,22 +54,95 @@ public class DeliveryOrderServiceImpl extends ServiceImpl<DeliveryOrderDao, Deli
         return currentProvider() != null;
     }
 
+    /**
+     * 当前启用的运力商 code。
+     *
+     * 配置表里可能有 5 家 is_enable=1，但代码只实现了其中 1 家（比如只实现了 mock）。
+     * 所以这里**不能只看 sort 最小的那条就返回** —— 那条很可能代码里根本没实现，
+     * 会导致「还没发单就已经注定失败」：
+     *   曾经的真实坑：5 家全是 is_enable=1，全靠 mock 的 sort=0 恰好最小才没出事。
+     *   谁在后台把 mock 停掉（mock 的类注释里正好写着「生产环境务必把 mock 置 0」），
+     *   currentProvider() 就会取到没实现的 wx，返回 null，**所有同城订单发单全部失败**。
+     *
+     * 现在的策略：
+     *   1. 按 sort 顺序遍历所有启用的配置，跳过代码里没有实现的（并逐个记 WARN 点名）
+     *   2. 返回第一个**配置启用且代码已实现**的
+     *   3. 全都不行就返回 null（caller 会退化成「未开启同城配送」，前台不显示这个选项）
+     */
     @Override
     public String currentProvider() {
-        DeliveryProviderConfig config = providerConfigDao.selectOne(new LambdaQueryWrapper<DeliveryProviderConfig>()
-                .eq(DeliveryProviderConfig::getIsEnable, true)
-                .eq(DeliveryProviderConfig::getIsDel, false)
-                .orderByAsc(DeliveryProviderConfig::getSort)
-                .last("limit 1"));
-        if (config == null) {
-            return null;
+        List<DeliveryProviderConfig> configs = providerConfigDao.selectList(
+                new LambdaQueryWrapper<DeliveryProviderConfig>()
+                        .eq(DeliveryProviderConfig::getIsEnable, true)
+                        .eq(DeliveryProviderConfig::getIsDel, false)
+                        .orderByAsc(DeliveryProviderConfig::getSort));
+        String skipped = null;
+        for (DeliveryProviderConfig config : configs) {
+            if (providerFactory.exists(config.getCode())) {
+                if (skipped != null) {
+                    // 点出「被跳过的那些」比只说「用了哪个」重要得多：
+                    // 它意味着后台配置需要收拾，而不是系统正常
+                    log.warn("[Delivery] 运力商配置需要清理：跳过了 {}，实际使用 {}",
+                            skipped, config.getCode());
+                }
+                return config.getCode();
+            }
+            skipped = (skipped == null ? "" : skipped + ",") + config.getCode();
+            log.error("[Delivery] 运力商 {} 已启用但代码里没有实现，已跳过，请检查 eb_delivery_provider 配置",
+                    config.getCode());
         }
-        // 配置里写了但代码没实现，属于配置错误，要能立刻发现
-        if (!providerFactory.exists(config.getCode())) {
-            log.error("[Delivery] 运力商 {} 已启用但代码里没有实现，请检查 eb_delivery_provider 配置", config.getCode());
-            return null;
+        if (skipped != null) {
+            log.error("[Delivery] 已启用的运力商 {} 在代码里全都没有实现，同城配送将被视为未开启", skipped);
         }
-        return config.getCode();
+        return null;
+    }
+
+    @Override
+    public java.util.Set<String> implementedProviderCodes() {
+        return providerFactory.codes();
+    }
+
+    /**
+     * 启动时自检一次运力商配置。
+     *
+     * 之所以放在启动而不是只靠列表接口：如果没人打开过后台配送管理页，
+     * 「配置启用了一堆没实现的运力商」这件事就永远没人知道，
+     * 直到某天有人停用了唯一能用的那家才集中爆发。启动日志是唯一必然会被人看到的地方。
+     *
+     * 刻意不抛异常：配置脏不应该导致整个服务起不来（那是更大的故障），
+     * 只记 ERROR 点名，让人照着去清配置。
+     */
+    @Override
+    public void afterPropertiesSet() {
+        try {
+            java.util.List<String> broken = auditProviderConfig();
+            java.util.Set<String> implemented = providerFactory.codes();
+            String using = currentProvider();
+            log.info("[Delivery] 运力商自检：代码已实现={} 配置需清理={} 当前生效={}",
+                    implemented, broken, using == null ? "无（同城配送不可用）" : using);
+        } catch (Exception e) {
+            // 自检本身失败不能影响启动
+            log.warn("[Delivery] 运力商配置自检失败（不影响启动）：{}", e.getMessage());
+        }
+    }
+
+    @Override
+    public java.util.List<String> auditProviderConfig() {
+        List<DeliveryProviderConfig> configs = providerConfigDao.selectList(
+                new LambdaQueryWrapper<DeliveryProviderConfig>()
+                        .eq(DeliveryProviderConfig::getIsDel, false)
+                        .orderByAsc(DeliveryProviderConfig::getSort));
+        java.util.List<String> broken = new java.util.ArrayList<>();
+        for (DeliveryProviderConfig config : configs) {
+            if (!providerFactory.exists(config.getCode())) {
+                broken.add(config.getCode());
+                if (Boolean.TRUE.equals(config.getIsEnable())) {
+                    log.error("[Delivery] 运力商 {}（{}）已启用但代码未实现，发单必然失败",
+                            config.getCode(), config.getName());
+                }
+            }
+        }
+        return broken;
     }
 
     @Override

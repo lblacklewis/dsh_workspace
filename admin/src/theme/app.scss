@@ -144,6 +144,69 @@ body,
   }
 }
 
+/* ============================================================
+ * StorApp 全局视觉统一（重绘）
+ * ------------------------------------------------------------
+ * 为什么放在 app.scss 这一层而不是每个视图里：
+ *   后台有几十个业务页面（商品/订单/用户…），逐个改 scoped 样式既慢又容易漏，
+ *   而且它们大量复用的是 Element UI 的默认观感（1px 灰边 + 直角 + 大留白）。
+ *   在这里统一一层「卡片 / 圆角 / 表头 / 按钮」，全站立刻一致。
+ * ============================================================ */
+
+/* 卡片：统一 12px 圆角 + 细边 + 轻阴影，去掉 Element 默认的硬阴影 */
+.el-card {
+  border-radius: 12px !important;
+  border: 1px solid #edf1f5 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px -22px rgba(15, 23, 42, 0.35) !important;
+  overflow: hidden;
+}
+.el-card__header {
+  padding: 16px 18px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.el-card__body {
+  padding: 18px;
+}
+
+/* 内容区背景：比纯白更有层次，让白卡浮起来 */
+.layout-main,
+.layout-backtop {
+  background-color: var(--prev-bg-main-color);
+}
+
+/* 表格：表头浅底 + 分割线收敛 */
+.el-table th.el-table__cell {
+  background: #f7fafc !important;
+  color: #475569 !important;
+  font-weight: 600;
+}
+.el-table td.el-table__cell {
+  border-bottom-color: #f1f5f9 !important;
+}
+.el-table--border,
+.el-table--group {
+  border-color: #edf1f5 !important;
+}
+
+/* 滚动条细一点 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* 进度条颜色
 ------------------------------- */
 #nprogress .bar {

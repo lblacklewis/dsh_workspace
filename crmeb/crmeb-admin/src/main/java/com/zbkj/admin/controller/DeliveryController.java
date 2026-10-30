@@ -21,9 +21,11 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 同城即时配送（后台）
@@ -49,14 +51,36 @@ public class DeliveryController {
     @Autowired
     private DeliveryProviderConfigDao providerConfigDao;
 
-    @ApiOperation(value = "运力商列表（含启用状态）")
+    @ApiOperation(value = "运力商列表（含启用状态 + 代码是否已实现）")
     @RequestMapping(value = "/provider/list", method = RequestMethod.GET)
-    public CommonResult<List<DeliveryProviderConfig>> providerList() {
+    public CommonResult<List<Map<String, Object>>> providerList() {
         List<DeliveryProviderConfig> list = providerConfigDao.selectList(
                 new LambdaQueryWrapper<DeliveryProviderConfig>()
                         .eq(DeliveryProviderConfig::getIsDel, false)
                         .orderByAsc(DeliveryProviderConfig::getSort));
-        return CommonResult.success(list);
+        Set<String> implemented = deliveryOrderService.implementedProviderCodes();
+        // 每次打开列表都顺手校验一遍配置，把「配了但没实现」的点出来
+        deliveryOrderService.auditProviderConfig();
+        String using = deliveryOrderService.currentProvider();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (DeliveryProviderConfig config : list) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("code", config.getCode());
+            item.put("name", config.getName());
+            item.put("isEnable", config.getIsEnable());
+            item.put("remark", config.getRemark());
+            item.put("sort", config.getSort());
+            // implemented：代码里有没有这个运力商的实现。前端必须据此区分
+            // 「已启用且能用」和「已启用但发单必然失败」，这是本次修复的核心。
+            boolean ok = implemented.contains(config.getCode());
+            item.put("implemented", ok);
+            item.put("inUse", ok && config.getCode().equals(using));
+            // 启用了却没实现 = 配置需要清理
+            item.put("configBroken", Boolean.TRUE.equals(config.getIsEnable()) && !ok);
+            result.add(item);
+        }
+        return CommonResult.success(result);
     }
 
     @ApiOperation(value = "切换运力商启用状态")
@@ -70,11 +94,13 @@ public class DeliveryController {
             throw new CrmebException("运力商不存在: " + code);
         }
         // 启用前先确认代码里有对应实现，否则会出现"配置开了但发单必然失败"
-        if (Boolean.TRUE.equals(enable) && !deliveryOrderService.isEnabled()) {
-            log.info("[Delivery] 后台尝试启用运力商 {}", code);
+        if (Boolean.TRUE.equals(enable) && !deliveryOrderService.implementedProviderCodes().contains(code)) {
+            throw new CrmebException("运力商「" + config.getName() + "」(" + code
+                    + ") 代码里还没有实现，启用后无法真正发单，请先完成对接再启用");
         }
         config.setIsEnable(Boolean.TRUE.equals(enable));
         providerConfigDao.updateById(config);
+        log.info("[Delivery] 后台{}运力商 {}（{}）", enable ? "启用" : "停用", code, config.getName());
         return CommonResult.success("ok");
     }
 

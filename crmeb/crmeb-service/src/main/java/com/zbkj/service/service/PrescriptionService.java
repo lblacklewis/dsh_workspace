@@ -53,4 +53,14 @@ public interface PrescriptionService extends IService<Prescription> {
 
     /** 处理合作平台回调 */
     boolean handleCallback(String providerCode, HttpServletRequest request, String rawBody);
+
+    /**
+     * 取当前生效的平台配置（含 clientID / 域名 / 回调地址）。
+     *
+     * ⚠️ 返回的 `secretKey` 是**密文**（enc: 前缀）。调用方需要明文时，
+     * 必须走 SensitiveDataCrypto.decrypt()，不要自己切字符串。
+     *
+     * 没有启用任何配置时返回 null。
+     */
+    com.zbkj.common.model.prescription.PrescriptionProviderConfig currentConfig();
 }

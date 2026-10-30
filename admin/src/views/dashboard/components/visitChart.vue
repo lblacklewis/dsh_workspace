@@ -16,7 +16,7 @@
           <div slot="header">
             <div class="acea-row row-between-wrapper">
               <div class="acea-row row-middle">
-                <!-- <el-avatar icon="el-icon-s-data" size="small" style="color:#1890ff;background:#e6f7ff;font-size: 13px" />
+                <!-- <el-avatar icon="el-icon-s-data" size="small" style="color:#0D9488;background:#e6f7ff;font-size: 13px" />
                                 <span class="ivu-pl-8">订单</span> -->
                 <div class="header_title">订单统计</div>
               </div>
@@ -151,7 +151,8 @@ export default {
             type: 'bar',
             itemStyle: {
               normal: {
-                color: '#5B8FF9',
+                // StorApp 重绘：订单金额柱用主色浅一档的 teal
+                color: '#5EEAD4',
               },
             },
             data: pices,
@@ -162,7 +163,8 @@ export default {
             smooth: true,
             itemStyle: {
               normal: {
-                color: '#4BCAD5',
+                // 订单数折线用主色，和柱形成同色系对比
+                color: '#0D9488',
               },
             },
             yAxisIndex: 1,
@@ -200,7 +202,7 @@ export default {
             type: 'bar',
             itemStyle: {
               normal: {
-                color: '#5B8FF9',
+                color: '#5EEAD4',
               },
             },
             data: prePrice,
@@ -209,7 +211,7 @@ export default {
             name: '本周金额',
             type: 'bar',
             itemStyle: {
-              normal: { color: '#4BCAD5' },
+              normal: { color: '#0D9488' },
             },
             data: price,
           },
@@ -218,7 +220,7 @@ export default {
             type: 'line',
             smooth: true,
             itemStyle: {
-              normal: { color: '#E6A23C' },
+              normal: { color: '#F59E0B' },
             },
             yAxisIndex: 1,
             data: preQuality,
@@ -228,7 +230,7 @@ export default {
             type: 'line',
             smooth: true,
             itemStyle: {
-              normal: { color: '#768A9C' },
+              normal: { color: '#94A3B8' },
             },
             yAxisIndex: 1,
             data: qualitys,
@@ -265,7 +267,7 @@ export default {
             type: 'bar',
             itemStyle: {
               normal: {
-                color: '#5B8FF9',
+                color: '#5EEAD4',
               },
             },
             data: prePrice,
@@ -275,7 +277,7 @@ export default {
             type: 'bar',
             itemStyle: {
               normal: {
-                color: '#4BCAD5',
+                color: '#0D9488',
               },
             },
             data: price,
@@ -286,7 +288,7 @@ export default {
             smooth: true,
             itemStyle: {
               normal: {
-                color: '#E6A23C',
+                color: '#F59E0B',
               },
             },
             yAxisIndex: 1,
@@ -298,7 +300,7 @@ export default {
             smooth: true,
             itemStyle: {
               normal: {
-                color: '#768A9C',
+                color: '#94A3B8',
               },
             },
             yAxisIndex: 1,
@@ -331,13 +333,13 @@ export default {
           qualitys.push(Number(res.quality[key]));
         }
         this.series = [
-          ////let col = ["#B37FEB", "#FFAB2B", "#1890FF", "#00C050"];
+          ////let col = ["#B37FEB", "#FFAB2B", "#0D9488", "#00C050"];
           {
             name: '去年金额',
             type: 'bar',
             itemStyle: {
               normal: {
-                color: '#5B8FF9',
+                color: '#5EEAD4',
               },
             },
             data: prePrice,
@@ -347,7 +349,7 @@ export default {
             type: 'bar',
             itemStyle: {
               normal: {
-                color: '#4BCAD5',
+                color: '#0D9488',
               },
             },
             data: price,
@@ -358,7 +360,7 @@ export default {
             smooth: true,
             itemStyle: {
               normal: {
-                color: '#E6A23C',
+                color: '#F59E0B',
               },
             },
             yAxisIndex: 1,
@@ -370,7 +372,7 @@ export default {
             smooth: true,
             itemStyle: {
               normal: {
-                color: '#768A9C',
+                color: '#94A3B8',
               },
             },
             yAxisIndex: 1,
@@ -409,7 +411,7 @@ export default {
     content: '';
     width: 2px;
     height: 18px;
-    background: #1890ff;
+    background: #0D9488;
     top: 0;
     left: 0;
   }

@@ -114,7 +114,7 @@ export default {
     content: '';
     width: 2px;
     height: 18px;
-    background: #1890ff;
+    background: #0D9488;
     top: 0;
     left: 0;
   }

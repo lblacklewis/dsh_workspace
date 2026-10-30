@@ -1,12 +1,15 @@
-$ErrorActionPreference = "Continue"
+﻿$ErrorActionPreference = "Continue"
 $API = "http://82.156.226.192"
 $A = "$API/dev-api/api/admin"
 
 [System.IO.File]::WriteAllText("$env:TEMP\l2.json", '{"account":"admin","pwd":"123456"}', [System.Text.UTF8Encoding]::new($false))
 $at = (curl.exe -s -X POST "$API/dev-api/api/admin/login" -H "Content-Type: application/json" --data-binary "@$env:TEMP\l2.json" | ConvertFrom-Json).data.token
 
+# MySQL 密码不写死：优先环境变量，没设则交互输入
+$MYSQL_PASS = if ($env:MYSQL_PASS) { $env:MYSQL_PASS } else { Read-Host '请输入 MySQL 密码(java_dev)' }
+
 function Sql($q) {
-    $s = "mysql -ujava_dev -pNPKntRXcCrx2AZ3i -N java_dev -e `"$q`" 2>/dev/null"
+    $s = "mysql -ujava_dev -p$MYSQL_PASS -N java_dev -e `"$q`" 2>/dev/null"
     $b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s))
     return (ssh -o StrictHostKeyChecking=no root@82.156.226.192 "echo $b | base64 -d | bash").Trim()
 }

@@ -3,25 +3,45 @@
     <div slot="header" class="clearfix">
       <span style="font-weight: 600">运力商</span>
       <el-alert
+        v-if="brokenCount > 0"
+        type="error"
+        :closable="false"
+        show-icon
+        :title="'有 ' + brokenCount + ' 个运力商「已启用但代码未实现」，发单必然失败，请停用它们'"
+        style="margin-top: 10px"
+      ></el-alert>
+      <el-alert
+        v-else
         type="warning"
         :closable="false"
         show-icon
-        title="未接入的运力商即使启用也无法真正发单；凭证到位后再启用"
+        title="灰色「未接入」的运力商代码里还没有实现，无法启用；完成对接后再开启"
         style="margin-top: 10px"
       ></el-alert>
     </div>
     <div class="pv-grid">
       <div v-for="p in providers" :key="p.code" class="pv-cell">
-        <div class="pv-card" :class="{ 'pv-on': p.isEnable }">
+        <div
+          class="pv-card"
+          :class="{ 'pv-on': p.isEnable && p.implemented, 'pv-broken': p.configBroken, 'pv-na': !p.implemented }"
+        >
           <div class="pv-head">
             <span class="pv-name">{{ p.name }}</span>
-            <el-tag size="mini" :type="p.isEnable ? 'success' : 'info'">
-              {{ p.isEnable ? '已启用' : '未启用' }}
-            </el-tag>
+            <el-tag size="mini" :type="statusTag(p).type">{{ statusTag(p).text }}</el-tag>
           </div>
-          <div class="pv-code">code: {{ p.code }}</div>
+          <div class="pv-code">
+            code: {{ p.code }}
+            <span v-if="p.inUse" class="pv-using">当前生效</span>
+          </div>
           <div class="pv-remark">{{ p.remark || '-' }}</div>
-          <el-button size="mini" :type="p.isEnable ? 'danger' : 'primary'" plain @click="toggle(p)">
+          <div v-if="!p.implemented" class="pv-hint">代码未接入，无法启用</div>
+          <el-button
+            size="mini"
+            :type="p.isEnable ? 'danger' : 'primary'"
+            plain
+            :disabled="!p.implemented && !p.isEnable"
+            @click="toggle(p)"
+          >
             {{ p.isEnable ? '停用' : '启用' }}
           </el-button>
         </div>
@@ -44,11 +64,26 @@ export default {
       loadError: '',
     };
   },
+  computed: {
+    brokenCount() {
+      return this.providers.filter((p) => p.configBroken).length;
+    },
+  },
   created() {
     // 在 created 里取（早于 mounted），并让本组件自己持有数据
     this.load();
   },
   methods: {
+    // 状态标签必须区分「能用」和「只是配置开着」——
+    // 之前 5 个卡片全显示「已启用」，操作员根本看不出哪个发单会失败
+    statusTag(p) {
+      if (p.implemented) {
+        return p.isEnable ? { type: 'success', text: '已启用' } : { type: 'info', text: '未启用' };
+      }
+      return p.isEnable
+        ? { type: 'danger', text: '已启用·未接入' }
+        : { type: 'info', text: '未接入' };
+    },
     load() {
       this.loadError = '';
       deliveryProviderList()
@@ -98,6 +133,14 @@ export default {
   border-color: #67c23a;
   background: #f0f9eb;
 }
+.pv-broken {
+  border-color: #f56c6c;
+  background: #fef0f0;
+}
+.pv-na {
+  background: #fafafa;
+  opacity: 0.75;
+}
 .pv-head {
   display: flex;
   justify-content: space-between;
@@ -113,10 +156,23 @@ export default {
   color: #909399;
   margin-bottom: 4px;
 }
+.pv-using {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #0d9488;
+  color: #fff;
+  font-size: 11px;
+}
 .pv-remark {
   font-size: 12px;
   color: #606266;
   min-height: 34px;
+  margin-bottom: 8px;
+}
+.pv-hint {
+  font-size: 12px;
+  color: #f56c6c;
   margin-bottom: 8px;
 }
 .pv-empty {

@@ -48,6 +48,9 @@ public class Prescription implements Serializable {
     @ApiModelProperty(value = "对方处方号")
     private String outerRxNo;
 
+    @ApiModelProperty(value = "对方问诊单号(桃子 orderID)")
+    private String outerOrderNo;
+
     @ApiModelProperty(value = "患者姓名(实名)")
     private String patientName;
 
@@ -65,14 +68,26 @@ public class Prescription implements Serializable {
     @ApiModelProperty(value = "诊断")
     private String diagnosis;
 
+    @ApiModelProperty(value = "科室code(桃子 sectionCode)")
+    private String sectionCode;
+
+    @ApiModelProperty(value = "科室名称(桃子 sectionName)")
+    private String sectionName;
+
     @ApiModelProperty(value = "开方医师")
     private String doctorName;
 
     @ApiModelProperty(value = "医师所属医院")
     private String doctorHospital;
 
-    @ApiModelProperty(value = "审核药师(后台管理员id)")
+    @ApiModelProperty(value = "审核药师(eb_pharmacist.id)")
     private Integer pharmacistId;
+
+    @ApiModelProperty(value = "审方药师姓名(冗余存，药师离职后仍可追溯)")
+    private String pharmacistName;
+
+    @ApiModelProperty(value = "审核来源 0未审 1我方药师 2平台药师(仅记录，不能替代我方审方)")
+    private Integer auditSource;
 
     @ApiModelProperty(value = "0待审核 1通过 2驳回")
     private Integer auditStatus;

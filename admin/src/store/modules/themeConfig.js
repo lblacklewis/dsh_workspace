@@ -79,7 +79,10 @@ const themeConfigModule = {
       // 分栏高亮风格：可选值"<columns-round|columns-card>"，默认 columns-round
       columnsAsideStyle: 'columns-card',
       // 分栏布局风格：可选值"<columns-horizontal|columns-vertical>"，默认 columns-horizontal
-      columnsAsideLayout: 'columns-horizontal',
+      // StorApp 改成 vertical：80px 宽的图标轨放不下「图标 + 文字」横排
+      //（横排时 .font13 只剩 52px，会被压到 26px 折行，和下一个条目的图标叠在一起），
+      // 竖排（图标在上、文字在下）才是这个宽度的正确用法。
+      columnsAsideLayout: 'columns-vertical',
 
       /**
        * 布局切换

@@ -1,0 +1,51 @@
+/* ============================================================
+ * StorApp 后台（Admin）样式兜底层（第 20 轮重绘后大幅精简）
+ *
+ * 现在后台的布局和观感已经在**源码层**做完（见 admin/src 的改动）：
+ *   - src/theme/app.scss            全局卡片 / 表格 / 滚动条统一
+ *   - src/layout/component/columnsAside.vue   左侧图标轨 108px + 竖排
+ *   - src/layout/component/header.vue         header 高度 84 -> 68
+ *   - src/views/dashboard/components/*.vue    控制台数据卡 / 快捷入口重绘
+ *   - src/store/modules/themeConfig.js        columnsAsideLayout: columns-vertical
+ *   - src/layout/navBars/breadcrumb/theme.js + setings.vue   主题色改 teal
+ *
+ * 这一层只保留「源码管不到」的两件事，作为兜底：
+ *   1. 老浏览器 localStorage 里可能存着主题色蓝的配置（themeConfig 会从本地恢复
+ *      并覆盖 app.scss 的默认值）。用一条极特异性的规则把主色钉成 teal，
+ *      这样无论本地存了什么，客户看到的都是药房青。
+ *      （他们去「设置 → 主题」切别的颜色仍然会被这条压住 —— 这是有意的，
+ *       demo 不需要换肤。真要放开，删掉这一节再重跑注入即可。）
+ *   2. 别的兜底样式按需再加。
+ *
+ * ⚠️ 后台不能用内联 <style> 注入（构建产物启动时会丢掉 head 里静态写入的节点），
+ *    必须用 <link> + 运行时自建节点守住，细节见 docs/交接_视觉升级.md 第六节坑 12。
+ * ============================================================ */
+
+:root,
+html,
+body,
+#app {
+  --prev-color-primary: #0D9488 !important;
+  --prev-color-primary-light: #5EEAD4 !important;
+  --prev-color-primary-light-9: #F0FDFA !important;
+  --prev-color-primary-light-8: #CCFBF1 !important;
+  --prev-MenuActiveColor: #0D9488 !important;
+  --prev-tag-active-color: #0D9488 !important;
+  --prev-bg-columnsMenuActiveBgColor: #0D9488 !important;
+  --prev-bg-columnsMenuBar: #ffffff !important;
+  --prev-bg-columnsMenuBarColor: #515a6e !important;
+  --prev-bg-menuBar: #ffffff !important;
+  --prev-bg-menuBarColor: #303133 !important;
+  --prev-bg-main-color: #EEF2F5 !important;
+}
+
+/* 主色相关的小面积元素，双保险（主题切换只改 --prev-color-primary 时也能跟上） */
+.layout-columns-aside .layout-columns-active,
+.layout-columns-aside .layout-columns-active a {
+  color: #0D9488 !important;
+}
+.layout-columns-aside ul .columns-card,
+.layout-columns-aside ul .columns-round {
+  background: rgba(13, 148, 136, 0.1) !important;
+  border-right: 3px solid #0D9488 !important;
+}

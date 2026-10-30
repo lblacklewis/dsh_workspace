@@ -83,6 +83,7 @@ export default {
   align-items: center;
   background: var(--prev-bg-topBar);
   border-bottom: 1px solid var(--prev-border-color-lighter);
-  padding-left: 15px;
+  padding-left: 18px;
+  padding-right: 18px;
 }
 </style>

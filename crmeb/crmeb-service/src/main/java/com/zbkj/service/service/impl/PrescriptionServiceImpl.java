@@ -4,17 +4,20 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zbkj.common.exception.CrmebException;
+import com.zbkj.common.model.pharmacist.Pharmacist;
 import com.zbkj.common.model.prescription.Consultation;
 import com.zbkj.common.model.prescription.OrderPrescription;
 import com.zbkj.common.model.prescription.Prescription;
 import com.zbkj.common.model.prescription.PrescriptionProduct;
 import com.zbkj.common.model.prescription.PrescriptionCallbackLog;
+import com.zbkj.common.model.prescription.PrescriptionProviderConfig;
 import com.zbkj.common.model.product.StoreProduct;
 import com.zbkj.service.dao.ConsultationDao;
 import com.zbkj.service.dao.OrderPrescriptionDao;
 import com.zbkj.service.dao.PrescriptionCallbackLogDao;
 import com.zbkj.service.dao.PrescriptionDao;
 import com.zbkj.service.dao.PrescriptionProductDao;
+import com.zbkj.service.dao.PrescriptionProviderConfigDao;
 import com.zbkj.service.dao.StoreProductDao;
 import com.zbkj.service.service.PrescriptionService;
 import com.zbkj.service.service.prescription.PrescriptionProvider;
@@ -46,7 +49,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescription>
-        implements PrescriptionService {
+        implements PrescriptionService, org.springframework.beans.factory.InitializingBean {
 
     /** 处方有效期默认 3 天（多数地区对互联网处方有效期的通行做法，按实际监管要求调整） */
     private static final int VALID_DAYS = 3;
@@ -63,8 +66,17 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
     @Autowired
     private com.zbkj.service.service.crypto.SensitiveDataCrypto sensitiveDataCrypto;
 
+    /**
+     * 执业药师档案：审方人资格校验用（合规指南第二十二条）
+     */
+    @Autowired
+    private com.zbkj.service.service.PharmacistService pharmacistService;
+
     @Autowired
     private ConsultationDao consultationDao;
+
+    @Autowired
+    private PrescriptionProviderConfigDao providerConfigDao;
 
     @Autowired
     private OrderPrescriptionDao orderPrescriptionDao;
@@ -163,10 +175,41 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
         if (rx.getAuditStatus() != null && rx.getAuditStatus() == 1) {
             throw new CrmebException("该处方已审核通过，不能重复审核");
         }
+
+        // ---------- 审方人资格校验 ----------
+        // 《处方药网络零售合规指南》第二十二条：处方审核**必须由本企业执业药师开展**，
+        // 不得由其他岗位人员或者人工智能代为实施。
+        //
+        // 现状问题：后台 /api/admin/prescription/audit 传进来的是**后台管理员 id**，
+        // 不是执业药师 id。若不校验，任何管理员账号都能审方 —— 直接违反第二十二条。
+        //
+        // 采取「**自激活**」策略（不引入配置开关，避免有人忘了打开）：
+        //   - 只要 eb_pharmacist 里存在**可审方**的药师（在职 + 有审方权限 + 注册有效），就强制校验，
+        //     传进来的 id 必须是合格药师，否则拒绝
+        //   - 一条合格药师都没有时（例如还没录入），放行但打 ERROR 点名
+        //     —— 这样不会把演示环境打死，同时上线前录入药师后**自动开始强制**
+        Pharmacist reviewer = null;
+        boolean hasQualified = pharmacistService.pickReviewer() != null;
+        if (hasQualified) {
+            reviewer = pharmacistService.requireReviewer(pharmacistId);
+        } else {
+            log.error("[Prescription] ⚠️ 合规风险：eb_pharmacist 中没有任何可审方的执业药师，"
+                    + "本次审方未校验审方人资格（操作人 id={}）。"
+                    + "依据《处方药网络零售合规指南》第二十二条，上线前必须录入执业药师档案",
+                    pharmacistId);
+        }
+
         rx.setAuditStatus(pass ? 1 : 2)
                 .setAuditRemark(remark == null ? "" : remark)
                 .setPharmacistId(pharmacistId == null ? 0 : pharmacistId)
                 .setAuditTime(new Date());
+        // 冗余存药师姓名：药师日后离职或改名，历史审方记录仍可追溯
+        if (reviewer != null) {
+            rx.setPharmacistName(reviewer.getName());
+            rx.setAuditSource(1); // 1 = 我方药师
+        } else {
+            rx.setAuditSource(0); // 未校验来源，留痕便于日后审计
+        }
         if (pass) {
             rx.setValidStart(new Date());
             rx.setValidEnd(daysLater(VALID_DAYS));
@@ -175,7 +218,10 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
             rx.setStatus(0);
         }
         updateById(rx);
-        log.info("[Prescription] 审核 rxNo={} 结果={} 药师={}", rx.getRxNo(), pass ? "通过" : "驳回", pharmacistId);
+        log.info("[Prescription] 审核 rxNo={} 结果={} 药师id={} 药师={} 校验={}",
+                rx.getRxNo(), pass ? "通过" : "驳回", pharmacistId,
+                reviewer == null ? "-" : reviewer.getName(),
+                hasQualified ? "已校验" : "未校验(无合格药师)");
         return rx;
     }
 
@@ -410,9 +456,92 @@ public class PrescriptionServiceImpl extends ServiceImpl<PrescriptionDao, Prescr
 
     // ---------- 内部工具 ----------
 
+    /**
+     * 当前生效的处方平台配置。
+     *
+     * 与 {@code DeliveryOrderServiceImpl.currentProvider()} 同一套防护逻辑，原因也一样：
+     * 配置表里可能启用了一堆平台，但代码只实现了其中一个。
+     * 如果只取「sort 最小的那条」就返回，那条很可能代码里根本没实现 ——
+     * 停掉唯一能用的那个之后，所有开方请求会全部失败。
+     * 配送模块当初就差点栽在这上面（5 个运力商全 is_enable=1，只实现了 mock）。
+     *
+     * 策略：按 sort 遍历所有启用的配置，**跳过代码里没有实现的**（逐个记 ERROR 点名），
+     * 返回第一个「配置启用且代码已实现」的；全都不行返回 null。
+     */
+    private PrescriptionProviderConfig currentProviderConfig() {
+        List<PrescriptionProviderConfig> configs = providerConfigDao.selectList(
+                new LambdaQueryWrapper<PrescriptionProviderConfig>()
+                        .eq(PrescriptionProviderConfig::getIsEnable, true)
+                        .eq(PrescriptionProviderConfig::getIsDel, false)
+                        .orderByAsc(PrescriptionProviderConfig::getSort));
+        StringBuilder skipped = new StringBuilder();
+        for (PrescriptionProviderConfig c : configs) {
+            if (providerFactory.exists(c.getCode())) {
+                if (skipped.length() > 0) {
+                    log.warn("[Prescription] 处方平台配置需要清理：跳过了 {}，实际使用 {}",
+                            skipped, c.getCode());
+                }
+                return c;
+            }
+            if (skipped.length() > 0) {
+                skipped.append(',');
+            }
+            skipped.append(c.getCode());
+            log.error("[Prescription] 处方平台 {} 已启用但代码里没有实现，已跳过，"
+                    + "请检查 eb_prescription_provider 配置", c.getCode());
+        }
+        if (skipped.length() > 0) {
+            log.error("[Prescription] 已启用的处方平台 {} 在代码里全都没有实现，开方将不可用", skipped);
+        }
+        return null;
+    }
+
+    /**
+     * 取当前平台配置（供对接层读 clientID/secretKey/域名/回调地址）。
+     * 没有启用配置时返回 null。
+     */
+    @Override
+    public PrescriptionProviderConfig currentConfig() {
+        return currentProviderConfig();
+    }
+
+    /** 启动自检：把「配置启用但代码未实现」的问题在启动日志里点名 */
+    @Override
+    public void afterPropertiesSet() {
+        try {
+            List<PrescriptionProviderConfig> configs = providerConfigDao.selectList(
+                    new LambdaQueryWrapper<PrescriptionProviderConfig>()
+                            .eq(PrescriptionProviderConfig::getIsDel, false));
+            List<String> broken = new ArrayList<>();
+            for (PrescriptionProviderConfig c : configs) {
+                if (!providerFactory.exists(c.getCode())) {
+                    broken.add(c.getCode());
+                    if (Boolean.TRUE.equals(c.getIsEnable())) {
+                        log.error("[Prescription] 处方平台 {}（{}）已启用但代码未实现，开方必然失败",
+                                c.getCode(), c.getName());
+                    }
+                }
+            }
+            PrescriptionProviderConfig cur = currentProviderConfig();
+            log.info("[Prescription] 处方平台自检：代码已实现={} 配置需清理={} 当前生效={}",
+                    providerFactory.codes(), broken,
+                    cur == null ? "无（开方不可用）" : cur.getCode());
+        } catch (Exception e) {
+            log.warn("[Prescription] 处方平台配置自检失败（不影响启动）：{}", e.getMessage());
+        }
+    }
+
     private PrescriptionProvider currentProvider() {
-        // 目前只有 mock；接入合作平台后改成从配置表读，与 DeliveryOrderService.currentProvider() 同构
-        return providerFactory.get("mock");
+        PrescriptionProviderConfig config = currentProviderConfig();
+        if (config == null) {
+            // 兜底：配置表为空时仍允许 mock 跑通演示（与配送模块行为一致）
+            if (providerFactory.exists("mock")) {
+                log.warn("[Prescription] 未启用任何处方平台，回退到 mock（仅供演示）");
+                return providerFactory.get("mock");
+            }
+            throw new CrmebException("未启用任何可用的处方平台，请到后台配置并启用");
+        }
+        return providerFactory.get(config.getCode());
     }
 
     private static String genRxNo() {

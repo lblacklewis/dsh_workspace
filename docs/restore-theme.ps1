@@ -13,9 +13,9 @@ param(
   [switch]$Apply,
   [string]$SshHost = "root@82.156.226.192",
   [string]$MysqlUser = "java_dev",
-  [string]$MysqlPass = "NPKntRXcCrx2AZ3i",
+  [string]$MysqlPass = $(if($env:MYSQL_PASS){$env:MYSQL_PASS}else{"‹环境变量 MYSQL_PASS›"}),
   [string]$MysqlDb = "java_dev",
-  [string]$RedisPass = "redis_dMtNMj"
+  [string]$RedisPass = $(if($env:REDIS_PASS){$env:REDIS_PASS}else{"‹环境变量 REDIS_PASS›"})
 )
 $ErrorActionPreference = "Stop"
 

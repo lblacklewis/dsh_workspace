@@ -961,6 +961,15 @@
 					}
 				}
 			]
+		},
+		{
+			"root": "pages/medical",
+			"pages": [{
+				"path": "insurance",
+				"style": {
+					"navigationBarTitleText": "医保电子凭证"
+				}
+			}]
 		}
 		// #endif 
 	],

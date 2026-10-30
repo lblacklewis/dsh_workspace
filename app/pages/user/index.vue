@@ -47,6 +47,27 @@
       @changeBarg="changeBarg"
       @goDetail="goDetail"
     ></PageDesign>
+
+    <!-- ===== 医保电子凭证入口 =====
+      为什么不走装修配置：用户中心的「我的服务」是 DIY 装修块，配置存在
+      eb_theme.user_data 里，而那份 JSON 当前是**坏的**（和 home_data 一样解析不了，
+      见 docs/云端部署记录.md）。所以入口在源码里固定一块，等 user_data 修好之后
+      再考虑挪进装修。
+      未登录时只提示、不跳转（凭证页自己也会拦）。 -->
+    <view class="mi-entry-wrap">
+      <view class="mi-entry" @tap="goInsurance">
+        <view class="mi-entry-ic"><text>医</text></view>
+        <view class="mi-entry-tx">
+          <text class="mi-entry-t">医保电子凭证</text>
+          <text class="mi-entry-s">就医购药一码通行 · 国家医保信息平台签发</text>
+        </view>
+        <view class="mi-entry-r">
+          <text class="mi-entry-badge">未激活</text>
+          <text class="mi-entry-arrow"></text>
+        </view>
+      </view>
+    </view>
+
     <image :src="copyRightPic" alt="" class="support"></image>
     <pageFooter :style="colorStyle"></pageFooter>
   </view>
@@ -358,6 +379,14 @@ export default {
         toLogin();
       }
     },
+    // 医保电子凭证入口：没登录先去登录，登录后再进凭证页
+    goInsurance() {
+      if (!this.isLogin) {
+        toLogin();
+        return;
+      }
+      uni.navigateTo({ url: '/pages/medical/insurance' });
+    },
     objToArr(data) {
       if (!data || typeof data !== "object") return [];
       let obj = Object.keys(data).sort();
@@ -627,6 +656,73 @@ export default {
     margin: 54rpx auto;
     display: block;
   }
+}
+
+/* ===== 医保电子凭证入口 =====
+   放在装修内容之后、版权图之前。卡片式，主色 teal，右侧「未激活」提示 + 箭头。 */
+.mi-entry-wrap {
+  padding: 0 24rpx;
+  margin-top: 20rpx;
+}
+.mi-entry {
+  display: flex;
+  align-items: center;
+  padding: 26rpx 28rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 20rpx rgba(15, 23, 42, 0.05);
+}
+.mi-entry-ic {
+  width: 76rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  text-align: center;
+  border-radius: 20rpx;
+  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+  color: #fff;
+  font-size: 38rpx;
+  font-weight: 600;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+.mi-entry-tx {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mi-entry-t {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+.mi-entry-s {
+  font-size: 22rpx;
+  color: #94a3b8;
+  margin-top: 8rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mi-entry-r {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.mi-entry-badge {
+  font-size: 21rpx;
+  color: #e11d48;
+  background: rgba(225, 29, 72, 0.08);
+  padding: 6rpx 14rpx;
+  border-radius: 20rpx;
+  margin-right: 12rpx;
+}
+.mi-entry-arrow {
+  width: 16rpx;
+  height: 16rpx;
+  border-top: 3rpx solid #cbd5e1;
+  border-right: 3rpx solid #cbd5e1;
+  transform: rotate(45deg);
 }
 .ysize {
   background-size: 100%;

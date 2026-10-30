@@ -211,9 +211,9 @@ export default {
                 },
                 normal: {
                   color: function (params) {
-                    //自定义颜色
-                    var colorList = ['#1BBE6B', '#1890FF', '#EF9C20', '#4BCAD5'];
-                    return colorList[params.dataIndex];
+                    //自定义颜色 —— StorApp 重绘：改成同色系 teal 梯度（原来绿/蓝/橙混搭）
+                    var colorList = ['#0D9488', '#14B8A6', '#5EEAD4', '#99F6E4'];
+                    return colorList[params.dataIndex % colorList.length];
                   },
                 },
               },
@@ -248,7 +248,7 @@ export default {
     content: '';
     width: 2px;
     height: 18px;
-    background: #1890ff;
+    background: #0D9488;
     top: 0;
     left: 0;
   }
@@ -327,7 +327,7 @@ export default {
 }
 
 .lan {
-  background: #1890ff;
+  background: #0D9488;
 }
 
 .iconshangpinliulanliang {
@@ -385,7 +385,7 @@ export default {
 .user-visitUser {
   width: 75%;
   height: 100px;
-  background: #f2f6ff;
+  background: #F0FDFA;
   // padding: 18px 0 18px 17px;
   -webkit-box-sizing: border-box;
   box-sizing: border-box;
@@ -402,7 +402,7 @@ export default {
 .user-visitUser-ti {
   width: 310px;
   height: 100px;
-  background: #1890ff;
+  background: #0D9488;
   transform: perspective(5em) rotateX(-11deg);
   margin-left: -104px;
   margin-top: 8px;
@@ -436,7 +436,7 @@ export default {
 .user-orderUser {
   width: 75%;
   height: 98px;
-  background: #f1fffa;
+  background: #F0FDFA;
   box-sizing: border-box;
 
   @media screen and (max-width: 1200px) {
@@ -451,7 +451,7 @@ export default {
 .user-orderUser-ti {
   width: 226px;
   height: 98px;
-  background: #4bcad5;
+  background: #14B8A6;
   transform: perspective(7em) rotateX(-20deg);
   margin-left: -62px;
   margin-top: 7px;

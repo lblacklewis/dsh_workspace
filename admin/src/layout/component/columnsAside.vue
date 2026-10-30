@@ -193,11 +193,17 @@ export default {
 </script>
 
 <style scoped lang="scss">
+/* ============================================================
+ * StorApp 重绘 —— 左侧分栏图标轨
+ *
+ * 为什么改：原来 80px + columns-horizontal，.font13 在 79px 的 flex 行里
+ * 只剩 52px，被压到 26px 后折行，和下一个条目的图标叠在一起（看着像一团糊）。
+ * 现在：108px 宽 + 竖排（图标在上、文字在下）+ 选中态浅 teal 底 + 右侧主色条。
+ * ============================================================ */
 .layout-columns-aside {
-  width: 80px;
+  width: 108px;
   height: 100%;
-  background: var(--prev-bg-columnsMenuBar);
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  background: #ffffff;
   border-right: 1px solid var(--prev-border-color-lighter);
   z-index: 20;
   ul {
@@ -205,33 +211,70 @@ export default {
     li {
       color: var(--prev-bg-columnsMenuBarColor);
       width: 100%;
-      height: 50px;
+      height: 62px;
       text-align: center;
       display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       position: relative;
       z-index: 1;
+      /* 竖排：图标 + 文案垂直居中 */
       .columns-vertical {
-        margin: auto;
-        .columns-vertical-title {
-          padding-top: 1px;
-        }
-      }
-      .columns-horizontal {
+        margin: 0 auto;
         display: flex;
-        height: 50px;
-        width: 100%;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 0 5px;
+        width: 100%;
         i {
-          margin-right: 3px;
+          display: block;
+          font-size: 18px;
+          line-height: 18px;
+          color: inherit;
+          transition: color 0.2s ease;
+        }
+        .font13,
+        .columns-vertical-title {
+          margin-top: 6px;
+          padding-top: 0;
+          font-size: 12px !important;
+          line-height: 14px !important;
+          letter-spacing: 0;
+          /* 关键：不折行、不被压缩 */
+          white-space: nowrap;
+          word-break: keep-all;
+          flex: 0 0 auto;
+        }
+      }
+      /* 横排（后台设置里仍可切回来）：图标不压缩、文字不折行 */
+      .columns-horizontal {
+        display: flex;
+        height: 62px;
+        width: 100%;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 0 10px;
+        i {
+          flex: 0 0 auto;
+          font-size: 16px;
+          margin-right: 7px;
         }
         a {
           display: flex;
+          flex: 0 0 auto;
           .columns-horizontal-title {
-            padding-top: 1px;
+            padding-top: 0;
+            font-size: 12px !important;
+            white-space: nowrap;
+            word-break: keep-all;
           }
+        }
+      }
+      &:hover {
+        background: rgba(13, 148, 136, 0.06);
+        i {
+          color: var(--prev-color-primary);
         }
       }
       a {
@@ -244,31 +287,36 @@ export default {
     //   color: var(--prev-bg-columnsMenuBarColor);
     // }
     .layout-columns {
-      transition: 0.3s ease-in-out;
+      transition: color 0.3s ease-in-out, background 0.3s ease-in-out;
+      &:hover {
+        color: var(--prev-color-primary);
+      }
     }
+    /* 选中态：不要整块实心色，改成浅 teal 底 + 主色文字 + 右侧主色条 */
     .layout-columns-active,
     .layout-columns-active a {
-      color: var(--prev-bg-columnsMenuActiveColor);
-      transition: 0.3s ease-in-out;
+      color: var(--prev-color-primary);
+      font-weight: 600;
+      transition: color 0.3s ease-in-out;
     }
 
     .columns-round {
-      background: var(--prev-color-primary);
-      // color: var(--prev-color-text-white);
+      background: rgba(13, 148, 136, 0.1);
       position: absolute;
       left: 50%;
-      top: 2px;
-      height: 50px;
-      width: 65px;
+      top: 0;
+      height: 62px;
+      width: 100%;
       transform: translateX(-50%);
       z-index: 0;
       transition: 0.3s ease-in-out;
-      border-radius: 5px;
+      border-radius: 0;
+      border-right: 3px solid var(--prev-color-primary);
     }
     .columns-card {
       @extend .columns-round;
       top: 0;
-      height: 50px;
+      height: 62px;
       width: 100%;
       border-radius: 0;
     }

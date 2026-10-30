@@ -505,9 +505,9 @@ export default {
         themeSelect['--prev-bg-menuBarColor'] = '#303133';
         themeSelect['--prev-border-color-lighter'] = '#ebeef5';
         if (val == 'theme-1') {
-          themeSelect['--prev-bg-menu-hover-ba-color'] = '#E5EEFF';
-          themeSelect['--prev-color-primary'] = '#0256FF';
-          themeSelect['--prev-MenuActiveColor'] = '#0256FF';
+          themeSelect['--prev-bg-menu-hover-ba-color'] = '#F0FDFA';
+          themeSelect['--prev-color-primary'] = '#0D9488';
+          themeSelect['--prev-MenuActiveColor'] = '#0D9488';
         } else if (val == 'theme-3') {
           themeSelect['--prev-bg-menu-hover-ba-color'] = '#ecf8f3';
           themeSelect['--prev-color-primary'] = '#41b584';

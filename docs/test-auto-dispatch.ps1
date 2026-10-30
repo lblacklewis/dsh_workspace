@@ -9,8 +9,11 @@ function Post($url, $token, $file) {
     if ($token) { return (curl.exe -s -X POST $url -H "Authori-zation: $token" -H "Content-Type: application/json" --data-binary "@$file") }
     return (curl.exe -s -X POST $url -H "Content-Type: application/json" --data-binary "@$file")
 }
+# MySQL 密码不写死：优先环境变量，没设则交互输入
+$MYSQL_PASS = if ($env:MYSQL_PASS) { $env:MYSQL_PASS } else { Read-Host '请输入 MySQL 密码(java_dev)' }
+
 function Sql($q) {
-    $s = "mysql -ujava_dev -pNPKntRXcCrx2AZ3i -N java_dev -e `"$q`" 2>/dev/null"
+    $s = "mysql -ujava_dev -p$MYSQL_PASS -N java_dev -e `"$q`" 2>/dev/null"
     $b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s))
     return (ssh -o StrictHostKeyChecking=no root@82.156.226.192 "echo $b | base64 -d | bash" 2>&1 | Out-String).Trim()
 }
