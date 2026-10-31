@@ -1,12 +1,119 @@
-ui-onboarding:
-  welcomeNoticeVersion: 2026-08-13.1
+# ⚠ 编码模式备忘（按文件类型区分，别搞混）：
+#   • YAML / JSON 配置（settings.yaml、package.json、cordis.patch.yml）
+#     → 必须 UTF-8 无 BOM。有 BOM 会导致解析失败、dsh web / 桌面版起不来。
+#     禁止 PowerShell Set-Content -Encoding UTF8（会写 BOM），改用 write 工具或
+#     [System.IO.File]::WriteAllText($p, $t, [System.Text.UTF8Encoding]::new($false))
+#   • *.ps1 脚本 → UTF-8 **with BOM**（PowerShell 5.1 才能正确显示中文）
+#
+# ⚠ 上下文上限备忘（2026-10-14 实测）：
+#   网关 api.scnet.cn 的真实上限 = 1,048,576 input tokens（litellm pre-call check）。
+#   超限时网关返回 "ContextWindowExceededError"，但常被包装成通用文案
+#   "OpenAIException - Invalid request. Please check the request parameters."，
+#   DSH 认不出 → 不触发自动压缩 → 会话持续 400（死锁，只能开新会话）。
+#   DSH 压缩阈值 = contextWindow × 0.8，故把 contextWindow 从 1000000 下调到
+#   500000（阈值 40 万），比原来提前一倍压缩，避免撞线。
+#   实例：termdeck 会话涨到 9155 条消息 / 8.79MB 后持续 400，只能靠交接文档开新会话。
+#   经验：长会话别贴整段日志、别频繁截图。
+#   • 会话超时：网关（api.scnet.cn）自己的 input-validation 截止时间在**服务端**，本地没有开关。
+#     DSH 这边唯一相关的旋钮是 provider 的 streamIdleTimeoutMs（默认 5 分钟，见
+#     packages/llm/llm-deepseek/src/index.ts:150 "Maximum provider idle time while one
+#     stream read is outstanding"）。2026-10-23 出现 "Gateway input-validation deadline
+#     exceeded" 后把它调到 15 分钟：大请求的**首字节**可能等很久，本地默认 5 分钟会先放弃。
+#     真正治本的是让请求变小（长会话写交接文档后开新会话 / 别把整段日志、大批文件读进上下文）。
 llm-deepseek:
+  baseURL: https://api.scnet.cn/api/gw/v1
+  apiKeyEnv: SCNET_API_KEY
+  reasoningEffort: high
+  streamIdleTimeoutMs: 900000
   models:
-    - id: deepseek-v4-flash
-      name: DeepSeek-V4-Flash
+    - id: deepseek-v4.1-flash
+      name: DeepSeek-V4.1-Flash 🖼 支持图片
       description: Fast, efficient, and economical; suited to focused, routine, or
-        parallel tasks.
-      contextWindow: 1000000
+        parallel tasks. Supports image input.
+      contextWindow: 500000
       inputModalities:
         - text
-  baseURL: https://api.scnet.cn/api/gw/v1
+        - image
+      imagePixelBudget: low
+    - id: deepseek-v4-flash
+      name: DeepSeek-V4-Flash（纯文本）
+      description: Fast, efficient, and economical; suited to focused, routine, or
+        parallel tasks.
+      contextWindow: 500000
+      inputModalities:
+        - text
+    - id: deepseek-v4-pro
+      name: DeepSeek-V4-Pro（纯文本）
+      description: Stronger agentic coding, knowledge, and difficult reasoning; suited
+        to complex or quality-critical tasks at higher cost.
+      contextWindow: 500000
+      inputModalities:
+        - text
+    - id: glm-5.3
+      name: GLM-5.3（纯文本）
+      contextWindow: 500000
+      inputModalities:
+        - text
+    - id: glm-5.3-flash
+      name: GLM-5.3-Flash（纯文本）
+      contextWindow: 500000
+      inputModalities:
+        - text
+    - id: gpt-5.6-terra-plus
+      name: gpt-5.6-terra-plus
+    - id: gpt-5.6-luna-plus
+      name: gpt-5.6-luna-plus
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+agent-default-model:
+  provider: deepseek-official
+  model: deepseek-v4.1-flash
+  reasoningEffort: high
+skin-custom-theme:
+  applied: true
+  light:
+    accent: "#4d6bfe"
+    background: "#f7f8fa"
+    foreground: "#2c2b2b"
+    contrast: 10
+skin-wallpaper:
+  enabled: false
+ui-theme:
+  preference: light
+pet:
+  visible: false
+  size: 160
+  right: 2233
+  bottom: 180
+  petId: ouo-neko
+dsh-usage:
+  enabled: false
+remote-web-ui:
+  enabled: true
+  autoTunnel: true
+  lanBind: true
+# 本地推理（公司内网 LiteLLM）：glm-5.3-flash 上游官方即视觉模型（zai 目录
+#   input:[text,image]），2026-10-24 声明 image 并把 requestImagePixelBudget
+#   设为 262144（512×512，对齐 deepseek 的 low 档）。网关的 glm-* 仍是纯文本。
+llm-pi-ai:
+  providers:
+    {
+      deepseek: { apiKeyEnv: DEEPSEEK_API_KEY },
+      local:
+        {
+          apiKeyEnv: LOCAL_API_KEY,
+          api: openai-completions,
+          baseURL: http://10.17.95.253:8030/v1,
+          requestImagePixelBudget: 262144,
+          models:
+            [
+              {
+                  id: glm-5.3-flash-local,
+                  name: glm-5.3-flash 🖼 支持图片,
+                  input: [ text, image ]
+                }
+            ]
+        }
+    }
+agent-presets:
+  default: standard
