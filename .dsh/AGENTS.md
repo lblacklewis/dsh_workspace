@@ -14,13 +14,13 @@
 
 | 用途 | 路径 |
 |------|------|
-| DSH 主目录 | `~/.dsh/` |
-| 全局配置 | `~/.dsh/settings.yaml`（**所有 profile 共享**，chokidar 热重载） |
+| DSH 主目录 | `~/.dsh/`（sessions/storages/凭证/AGENTS.md **全局共享**） |
+| Web 配置 | `~/.dsh/settings.yaml`（CLI 0.1.x 读它；chokidar 热重载） |
+| 桌面版配置 | `~/.dsh/profiles/desktop/cordis.patch.yml`（桌面版 0.2.x 自管） |
 | 凭证 | `~/.dsh/.credentials.yaml`（gitignore，每台机器单独配） |
-| Web profile | `~/.dsh/profiles/web/`（`dsh web`） |
-| 桌面版 profile | `~/.dsh/profiles/desktop/`（Electron **独占**，CLI 禁止操作） |
+| Web profile | `~/.dsh/profiles/web/`（`dsh web`，端口 3080） |
+| 桌面版 profile | `~/.dsh/profiles/desktop/`（Electron **独占**，CLI 禁止操作，端口 8202） |
 | 本角色定义 | `~/.dsh/AGENTS.md` ← 仓库 `.dsh/AGENTS.md` |
-| Web GUI | http://127.0.0.1:3080 |
 
 ## 铁律（都是踩过的坑）
 
@@ -55,13 +55,14 @@
 - **长会话自救**：让会话写交接文档 → 提交 → **开新会话读交接文档继续**（旧会话救不回来）
 - **预防**：别贴整段构建/探针日志、别频繁截图、任务告一段落就让它写交接记录
 
-### 4. Web 版 vs 桌面版（不能混用配置）
+### 4. Web 版 vs 桌面版（配置分家，详见第 6 条）
 
-- **`settings.yaml` 是共享的**，但 Web 专有配置会**搞崩桌面版**：
+- Web 专有配置会**搞崩桌面版**：
   `remote-web-ui`（随 `@linxin666/dsh-web-all` 安装）会 `lanBind: 0.0.0.0` + 开启配对门控
   → 桌面版 Electron 访问 `/api` 被判「未配对」→ **403**
 - 部署脚本：`.\setup.ps1`（自动识别）/ `-Mode web` / `-Mode desktop`
-- 桌面版模板：`.dsh/settings.desktop.yaml`（不含 `remote-web-ui`）
+- 桌面版模板：`.dsh/settings.desktop.yaml`（不含 `remote-web-ui`；0.2.x 起桌面版配置自管，
+  该模板只在首次导入时起作用）
 - 桌面版**不要装** `dsh-web-all`；插件要在**应用内**管理，别手改 `profiles/desktop`
 
 ### 5. 插件安装
@@ -72,6 +73,27 @@
 - 坑：pnpm 换版本时若 `cloudflared` 目录被隧道进程占用会 `os error 5`，
   可手动 `mklink /J` + 手改 package.json 协议 + `pnpm install --lockfile-only`
 
+### 6. 配置架构：会话共享、配置分家（2026-11-04 实测）
+
+- **共享的**（都在 `~/.dsh/` 下，与 profile 无关）：`sessions/`、`storages/`、`attachments/`、
+  `.credentials.yaml`、`AGENTS.md`
+  → 所以**桌面版一启动就能看到 Web 版建的全部会话**（实测 28 个），这是设计不是 bug
+  → ⚠️ 两个实例共享同一份会话存储：**别同时开 `dsh web` 和桌面版操作同一个会话**
+- **分家的**：只有 `~/.dsh/profiles/<名字>/`（插件组合）
+- **配置源按版本分**：
+
+  | 运行方式 | 版本 | 配置源 |
+  |---|---|---|
+  | `dsh web`（CLI） | 0.1.5-rc.1 | `~/.dsh/settings.yaml` |
+  | 桌面版（Electron） | 0.2.1-rc.5 | `~/.dsh/profiles/desktop/cordis.patch.yml` |
+
+- 桌面版 **0.2.x 首次运行会把 `~/.dsh/settings.yaml` 导入进自己的 profile patch，并把原文件
+  改名 `settings.yaml.imported`**（本机发生于 2026-10-31）→ 此后全局 settings.yaml 消失，
+  **旧版 CLI 的 `dsh web` 就没配置可读了**
+- 本机（2026-11-04 起）**只用桌面版**，故不恢复 settings.yaml；改配置直接改
+  `profiles/desktop/cordis.patch.yml`（在桌面 UI 里改设置也会自动重写它）
+- 需要恢复 Web 版时：把 `settings.yaml.imported` 复制回 `~/.dsh/settings.yaml`
+
 ## 常用操作
 
 ```powershell
@@ -81,8 +103,8 @@ cd D:\project\dsh-workspace; .\setup.ps1
 # 回收本机配置到仓库
 .\sync.ps1; git add -A; git commit -m "..."; git push
 
-# 检查 3080 服务
-Get-NetTCPConnection -LocalPort 3080 -State Listen
+# 检查服务端口（桌面版 8202 / Web 3080）
+Get-NetTCPConnection -LocalPort 8202 -State Listen -ErrorAction SilentlyContinue
 
 # 检查配置编码（False 才对）
 $b=[System.IO.File]::ReadAllBytes("$env:USERPROFILE\.dsh\settings.yaml")

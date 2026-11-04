@@ -23,7 +23,7 @@ cd dsh_workspace
 | 模式 | 行为 |
 |------|------|
 | `web` | 复制完整 settings.yaml（含 remote-web-ui 等）+ `profiles/web` |
-| `desktop` | 只复制**通用** settings（无 remote-web-ui）+ 会话记忆，**不碰** `profiles/`（桌面版 profile 由 Electron 独占管理） |
+| `desktop` | 只复制**通用** settings（无 remote-web-ui）+ 会话记忆，**不碰** `profiles/`（桌面版 profile 由 Electron 独占管理）<br>⚠️ 桌面版 **0.2.x** 首次运行会把这份 settings.yaml 导入自己的 profile patch 并改名为 `settings.yaml.imported`，之后配置以 `profiles/desktop/cordis.patch.yml` 为准 |
 
 也可手动指定：
 
@@ -47,13 +47,30 @@ cd dsh_workspace
 
 ## 🖥️ 桌面版（DSH Desktop）特别注意
 
-**桌面版 ≠ Web 版**，两者的 profile 与插件体系不同：
+**桌面版 ≠ Web 版**，两者的 profile 与**配置源**都不同：
 
-| 项目 | Web 版 | 桌面版 |
+| 项目 | Web 版（CLI 0.1.x） | 桌面版（0.2.x） |
 |------|--------|--------|
 | profile 目录 | `~/.dsh/profiles/web/` | `~/.dsh/profiles/desktop/`（Electron 独占） |
+| 端口 | 3080 | 8202 |
 | 插件安装 | `dsh plugin --profile web add <pkg>` | 桌面版**应用内**插件管理（CLI 禁止操作 desktop profile） |
-| settings.yaml | **共享** `~/.dsh/settings.yaml` | **同一份** ⚠️ |
+| **配置源** | `~/.dsh/settings.yaml` | `~/.dsh/profiles/desktop/cordis.patch.yml` |
+| 会话 / 凭证 / `AGENTS.md` | ⭐ **全局共享** | ⭐ **同一份** |
+
+### ⭐ 会话为什么跨版本自动可见（2026-11-04 实测）
+
+`~/.dsh/` 下的 `sessions/`、`storages/`、`attachments/`、`.credentials.yaml`、`AGENTS.md`
+是**全局共享**的，只有 `profiles/<名字>/` 分家。所以桌面版一启动就看到了 Web 版建的全部历史会话
+（实测 28 个）。⚠️ **别同时开两个实例操作同一个会话。**
+
+### ⚠️ 桌面版 0.2.x 会"吞掉"全局 settings.yaml
+
+桌面版 0.2.x 首次运行会把 `~/.dsh/settings.yaml` **导入进自己的 profile patch**，
+并把原文件改名为 `settings.yaml.imported`（本机发生于 2026-10-31）。之后：
+
+- 桌面版配置**只认** `profiles/desktop/cordis.patch.yml`（在 UI 里改设置会自动重写它）
+- **旧版 CLI 的 `dsh web` 读不到配置了**（它只认 `~/.dsh/settings.yaml`）
+- 需要恢复 Web 版时：把 `settings.yaml.imported` 复制回 `~/.dsh/settings.yaml` 即可
 
 ### ⚠️ 已知坑：桌面版报 403（client 相关）
 
