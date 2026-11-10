@@ -327,7 +327,7 @@ ls /dev/rshim0/               # boot  console  misc  rshim
 
 | 字段 | 含义 |
 |---|---|
-| `BF_MODE` | `DPU mode` / NIC 模式 —— 判断模式是否真的生效的**权威字段** |
+| `BF_MODE` | `DPU mode` / `NIC mode` —— ⚠️ **在本卡上不可信，见 6.7 节** |
 | `BOOT_MODE` | `0:rshim  1:emmc  2:emmc-boot-swap` —— 从哪引导 |
 | `OPN_STR` | 卡型号字符串；`N/A` = ARM/UEFI 没走到填它的阶段 |
 | `UP_TIME` | DPU 上电秒数 —— **复位是否真的发生的铁证**（软复位成功会归零） |
@@ -373,6 +373,62 @@ ls /dev/rshim0/               # boot  console  misc  rshim
 
 `openibd.service` 原本是 **`failed`** 状态（inbox → OFED 驱动切换时的残留），
 `systemctl restart openibd` 后恢复 `enabled / active`。
+
+### 6.7 ⚠️ `BF_MODE` 在本卡上不可信 —— 别被它误导（重要更正）
+
+**症状**：`INTERNAL_CPU_MODEL = SEPARATED_HOST(0)`、host PF 正常绑定、100G 链路已 up，
+但 `cat /dev/rshim0/misc` 里的 `BF_MODE` 依然显示 **`DPU mode`**。
+
+**原因**（查证 rshim 源码 —— 仓库名是 **`Mellanox/rshim-user-space`**，不是 `Mellanox/rshim`；
+实现在 `src/rshim_fuse.c`）：
+
+```c
+const char* bf3_bf_mode_str[] = { "Unknown", "DPU mode", "NIC mode", "Reserved" };
+
+const char* bf3_get_bf_mode(rshim_backend_t* bd) {
+  uint64_t value;
+  int rc = bd->read_rshim(bd, RSHIM_CHANNEL, bd->regs->scratchpad2, &value,
+                          RSHIM_REG_SIZE_8B);
+  if (rc || RSHIM_BAD_CTRL_REG(value)) return bf3_bf_mode_str[0];
+  return bf3_bf_mode_str[BF3_RSH_SCRATCHPAD2__BF_MODE(value)];
+}
+```
+
+- `BF_MODE` 读的是 rshim 的 **`SCRATCHPAD2` 普通暂存寄存器**；
+- 它**由 DPU 侧（ARM / ATF / UEFI）写入上报**，**主机侧的 `mlxconfig` 根本不碰它**；
+- 而且这一行只在 `ver_id == RSHIM_BLUEFIELD_3` 时才打印。
+
+**本卡的 ARM 从来没能启动**（`BOOT_MODE=1(emmc)` 但 eMMC 里没有 BFB），
+于是**没有任何人会去更新 SCRATCHPAD2** → 它保留的是残留/默认值，
+与 `INTERNAL_CPU_MODEL` 之间**没有因果关系**。
+
+**结论 —— 本卡上判断模式只认这三条**：
+
+| 判据 | 权威性 |
+|---|---|
+| `mlxconfig -d <dev> q` 里的 `INTERNAL_CPU_MODEL` | ✅ flash 里的真实配置 |
+| 那 4 个派生参数是否消失（`PAGE_SUPPLIER` / `ESWITCH_MANAGER` / `IB_VPORT0` / `OFFLOAD_ENGINE`） | ✅ DPU 模式专属，消失即证明已切走 |
+| host PF 是否绑上 `mlx5_core` 并产出 netdev | ✅ 最终事实 |
+
+`BF_MODE` 只在 **DPU 侧有正常运行的 OS** 时才有参考价值。本卡这种「ARM 无系统」的场景下
+**它是噪音 —— 看到 `DPU mode` 不要慌、更不要据此去重切模式。**
+
+> 顺带纠正另一个容易误读的字段：misc 里的 `SECURE_NIC_MODE` 取自 `bd->locked_mode`，
+> 是 **rshim 的归属锁（ownership lock）**，跟"网卡模式"毫无关系。
+
+**当前实测复核（2026-11-10）**：
+
+```
+INTERNAL_CPU_MODEL   SEPARATED_HOST(0)          ← flash 里确实是 NIC 模式
+3b:00.0/.1        -> mlx5_core                  ← PF 正常绑定
+enp59s0f1np1         UP  100000Mb/s  carrier=1  ← 链路正常
+BF_MODE              DPU mode                   ← ⚠️ 残留值，忽略
+UP_TIME              403079(s) ≈ 4.66 天        ← 自 11-05 冷启动起未再断电
+```
+
+> 注意 `UP_TIME` 的用法：**温重启（`reboot`）不会让它归零**。
+> 2026-11-09 16:34 主机重启过一次（`uptime` 只 19 小时），但 DPU 的 `UP_TIME`
+> 仍是 4.66 天 —— 说明卡一直带电。**只有它归零才证明卡真的断过电。**
 
 ---
 
