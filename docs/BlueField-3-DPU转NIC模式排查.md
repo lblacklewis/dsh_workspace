@@ -4,6 +4,41 @@
 > **主机**：`node20-39`（`10.17.21.85`，Ubuntu 22.04.4 LTS，kernel `5.15.0-105-generic`，DOCA/OFED 3.2.2）
 > **登录**：`root` / 密码见密码管理器（**不要写进仓库**）
 > **结论**：✅ **已修复**。BF3 现为双口 100GbE 网卡，`enp59s0f1np1` 以 100 Gb/s 上线。
+>
+> ⚠️ **但修复用的参数后来发现是 NVIDIA 已弃用的** —— 见下方更正框。
+
+---
+
+## ⚠️ 重要更正（2026-11-10）：模式开关是 `INTERNAL_CPU_OFFLOAD_ENGINE`
+
+**本文 §3.2 用的 `INTERNAL_CPU_MODEL=SEPARATED_HOST` 能修好，但走的是 NVIDIA 明确弃用的参数。**
+
+BlueField-3 的 **DPU/NIC 模式开关正式名称是 `INTERNAL_CPU_OFFLOAD_ENGINE`**：
+
+| 值 | 模式 |
+|---|---|
+| `ENABLED(0)` | **DPU 模式** |
+| `DISABLED(1)` | **NIC 模式** |
+| 带 `RO` 前缀（`RO INTERNAL_CPU_OFFLOAD_ENGINE ...`） | DPU 模式 + Zero Trust（只读） |
+
+官方命令行切法（**BF3 只需这一个参数**）：
+
+```bash
+mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=DISABLED   # → NIC 模式
+mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=ENABLED    # → DPU 模式
+```
+
+官方对 `SEPARATED_HOST` 的原话：
+
+> **"Separated Host Mode is obsolete for BlueField DPU/SuperNIC SKUs and should not be used**,
+> even if it remains visible in some configuration menus or options.
+> Separated Host Mode is available only for BlueField controller SKUs,
+> where the BlueField Arm OS is the sole CPU/OS in the chassis."
+
+**本文其它部分（故障链条、证据、硬件清单、冷启动验证、A/B/A 实验）都仍然有效** ——
+只有"用哪个参数切模式 / 怎么判断当前模式"这两条需要更正。详见 §3.2 与 §6.7。
+
+来源：[NVIDIA · BlueField Modes of Operation（DOCA 3.2.3）](https://networking-docs.nvidia.com/doca/archive/3-2-3/bluefield-modes-of-operation.md)
 
 ---
 
@@ -97,7 +132,7 @@ host PF 的固件初始化需要 ECPF 供给 page + IB vport0 → 供给不上
         ↓
 probe 失败 → ip a 没有 / ibstat 没有     （mst 仍能看到，因为只需 PCI 配置空间）
         ↓
-【修复】mlxconfig 切 SEPARATED_HOST + 断电冷启动
+【修复】mlxconfig 切 SEPARATED_HOST + 断电冷启动   ⚠️ 走的是**已弃用**参数，见 §3.2 更正
         ↓
 mlx5_core 绑定成功 → enp59s0f0np0 / enp59s0f1np1 出现，ibstat 的 CA 数 4 → 6
 ```
@@ -113,7 +148,34 @@ DEV=/dev/mst/mt41692_pciconf0
 mlxconfig -d $DEV q > /root/bf3-mlxconfig-BEFORE-$(date +%Y%m%d-%H%M%S).txt
 ```
 
-### 3.2 切到 NIC 模式
+### 3.2 ⚠️ 更正：BlueField-3 切 NIC 模式的**正确**命令（2026-11-10 追加）
+
+> **本节是更正。** 原先我只用 `INTERNAL_CPU_MODEL=SEPARATED_HOST` 就修好了，而且能 A/B/A 复现，
+> 但那是 NVIDIA **明确弃用**的参数。官方
+> [BlueField Modes of Operation](https://networking-docs.nvidia.com/doca/archive/3-2-3/bluefield-modes-of-operation.md)
+> 原文：
+>
+> > **"Separated Host Mode is obsolete for BlueField DPU/SuperNIC SKUs and should not be used**,
+> > even if it remains visible in some configuration menus or options.
+> > Separated Host Mode is available only for BlueField controller SKUs,
+> > where the BlueField Arm OS is the sole CPU/OS in the chassis."
+>
+> 官方给的命令行切法（**BlueField-3**）：
+
+```bash
+# DPU 模式 → NIC 模式（BlueField-3）
+mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=DISABLED
+# NIC 模式 → DPU 模式（BlueField-3）
+mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=ENABLED
+```
+
+> 只有 **BlueField-2** 才需要四个参数一起设
+> （`INTERNAL_CPU_PAGE_SUPPLIER` + `ESWITCH_MANAGER` + `IB_VPORT0` + `OFFLOAD_ENGINE`）。
+>
+> ⚠️ 我那条 `SEPARATED_HOST` 走法的副作用：**它会让 `INTERNAL_CPU_OFFLOAD_ENGINE`
+> 从 `mlxconfig q` 里整个消失** —— 而那正是 NVIDIA 指定的模式判据（详见 §6.7）。
+
+### 3.2b 当时实际用的命令（已弃用路径，仅作历史记录）
 
 ```bash
 mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_MODEL=SEPARATED_HOST
@@ -133,7 +195,19 @@ Applying... Done!
 
 ### 3.3 ⚠️ 必须断电冷启动 —— 这一步不能省
 
-**`INTERNAL_CPU_MODEL` 是上电时锁存的，任何软件复位都改不动它。**
+**`INTERNAL_CPU_MODEL` 是上电时锁存的，任何软件复位都改不动它。**（实测结论）
+
+官方对"改模式"的说法一致：**"For the configuration to take effect, Arm and NIC components
+must undergo a reset. Power cycle is recommended."** —— 推荐上电循环。
+
+另外官方还提供两条**可能不需要断 AC** 的路径（本卡有集成 BMC，值得一试）：
+
+- ⭐ **DPU-BMC Redfish**：
+  `POST https://<bmc_ip>/redfish/v1/Systems/Bluefield/Oem/Nvidia/Actions/Mode.Set`
+  body `{"Mode": "NicMode"}` 或 `{"Mode": "DpuMode"}`
+  → 官方说明 **"two consecutive Arm reboots are required"**（**没提断 AC**）
+- **主机 UEFI (HII) 菜单**：`BlueField Internal Cpu Configuration` → 设 `Internal Cpu Offload Engine`
+
 以下路径全部试过并失败，**下次不要再浪费时间**：
 
 | 尝试 | 结果 |
@@ -288,10 +362,22 @@ IPv6: ADDRCONF(NETDEV_CHANGE): enp59s0f1np1: link becomes ready
 
 ## 五、回滚（想切回 DPU 模式）
 
+**BlueField-3 的正确写法**（2026-11-10 更正）：
+
+```bash
+mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=ENABLED
+# 官方：配置生效需 Arm 与 NIC 侧复位，推荐上电循环
+```
+
+当时实际用的是**已弃用参数**的等价写法（也能用，但别学）：
+
 ```bash
 mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_MODEL=EMBEDDED_CPU
-# 同样必须断 AC 冷启动才生效
 ```
+
+> ✅ 而且 `INTERNAL_CPU_MODEL` 的**出厂默认值就是 `EMBEDDED_CPU(1)`**
+> （`mlxconfig -e q` 的 `Default` 列实测），所以"还原"其实就是**回到默认值**。
+> 2026-11-10 该卡已还原为默认的 DPU 模式，`INTERNAL_CPU_OFFLOAD_ENGINE = ENABLED(0)`。
 
 完整旧配置快照在目标机：`/root/bf3-mlxconfig-BEFORE-20261105-191847.txt`
 
@@ -426,11 +512,32 @@ const char* bf3_get_bf_mode(rshim_backend_t* bd) {
 
 **结论 —— 本卡上判断模式只认这三条**：
 
+⭐⭐ **官方判据（原文照抄，2026-11-10 更正）**：
+
+```bash
+host# mlxconfig -d /dev/mst/<device> q INTERNAL_CPU_OFFLOAD_ENGINE
+```
+
+| 输出 | 含义 |
+|---|---|
+| `ENABLED(0)` | **DPU 模式** |
+| `DISABLED(1)` | **NIC 模式** |
+| 带 `RO` 前缀（`RO INTERNAL_CPU_OFFLOAD_ENGINE ENABLED(0)`） | **DPU 模式 + Zero Trust**（只读，被限制） |
+
 | 判据 | 权威性 |
 |---|---|
-| `mlxconfig -d <dev> q` 里的 `INTERNAL_CPU_MODEL` | ✅ flash 里的真实配置 |
-| 那 4 个派生参数是否消失（`PAGE_SUPPLIER` / `ESWITCH_MANAGER` / `IB_VPORT0` / `OFFLOAD_ENGINE`） | ✅ DPU 模式专属，消失即证明已切走 |
+| ⭐ **`INTERNAL_CPU_OFFLOAD_ENGINE`** | ✅✅ **NVIDIA 官方指定的模式判据**（上表） |
+| `INTERNAL_CPU_MODEL` | ❌ **不能当模式判据** —— 见下方说明 |
+| 那 4 个派生参数是否消失 | ⚠️ 只对"用弃用参数切走"这一条路径有效 |
 | host PF 是否绑上 `mlx5_core` 并产出 netdev | ✅ 最终事实 |
+
+> ⚠️ **我原先写的"看 `INTERNAL_CPU_MODEL` + 看 4 个派生参数是否消失"是次优甚至误导的：**
+> - 一旦用了弃用的 `SEPARATED_HOST` 路径，`INTERNAL_CPU_OFFLOAD_ENGINE` 会**整个消失**，
+>   官方判据就用不了了；
+> - 而走官方路径（只改 `OFFLOAD_ENGINE`）时，`INTERNAL_CPU_MODEL` **大概率始终是
+>   `EMBEDDED_CPU`**，根本区分不出模式。
+>
+> 所以 `INTERNAL_CPU_MODEL` 变化只是我那条弃用路径的**副作用**，不是模式指示器。
 
 `BF_MODE` 只在 **DPU 侧有正常运行的 OS** 时才有参考价值。本卡这种「ARM 无系统」的场景下
 **它是噪音 —— 看到 `DPU mode` 不要慌、更不要据此去重切模式。**
@@ -478,8 +585,9 @@ INTERNAL_CPU_OFFLOAD_ENGINE   ENABLED(0)
 
 > ⚠️ 还原很容易，但**每切一次都要付一次断 AC 的代价**。
 > 本文写作时该机器处于 **A' 状态（DPU 模式，网卡不可用）**。
-> 想回到 B：`mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_MODEL=SEPARATED_HOST`
-> + **再断一次 AC**。
+> 想回到 B：`mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=DISABLED`
+> + **再断一次 AC**（官方推荐上电循环）。
+> ⚠️ **别再用 `INTERNAL_CPU_MODEL=SEPARATED_HOST`** —— 那是弃用参数，见 §3.2。
 
 ---
 

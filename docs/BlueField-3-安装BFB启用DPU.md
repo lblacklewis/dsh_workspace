@@ -44,10 +44,22 @@ FW            32.47.1088   (2025-09-12)
 Security      secure-fw                     ← ⚠️ 只能用签名镜像
 Base MAC      a4a64e490efa
 PCI          3b:00.0 / .1 (PF) · 3b:00.2 (SoC 管理口)
-mlxconfig     INTERNAL_CPU_MODEL = EMBEDDED_CPU(1)      ← DPU 模式，正是我们要的
+mlxconfig     INTERNAL_CPU_OFFLOAD_ENGINE = ENABLED(0)   ← ⭐ DPU 模式（官方判据）
+              INTERNAL_CPU_MODEL = EMBEDDED_CPU(1)       ← 出厂默认值，仅参考
 派生参数      PAGE_SUPPLIER/ESWITCH_MANAGER/IB_VPORT0 = ECPF(0)
-              OFFLOAD_ENGINE = ENABLED(0)
 ```
+
+> ⭐ **判断 DPU/NIC 模式只认这一条**（NVIDIA 官方指定）：
+>
+> ```bash
+> mlxconfig -d /dev/mst/mt41692_pciconf0 q INTERNAL_CPU_OFFLOAD_ENGINE
+> #   ENABLED(0)  = DPU 模式   ← 本机当前
+> #   DISABLED(1) = NIC 模式
+> #   带 RO 前缀  = DPU 模式 + Zero Trust（只读）
+> ```
+>
+> ⚠️ `INTERNAL_CPU_MODEL` **不是**模式判据；`SEPARATED_HOST` 是 NVIDIA 已弃用的参数，别用。
+> 详见 [`BlueField-3-DPU转NIC模式排查.md`](BlueField-3-DPU转NIC模式排查.md) §3.2 / §6.7。
 
 ### rshim 通道：已就绪
 
@@ -324,26 +336,30 @@ ibstat | grep -c '^CA '
 
 | 步骤 | 状态 |
 |---|---|
-| 1. `mlxconfig set INTERNAL_CPU_MODEL=EMBEDDED_CPU` | ✅ 已完成 |
+| 1. 确保处于 DPU 模式<br>（`INTERNAL_CPU_OFFLOAD_ENGINE=ENABLED(0)`） | ✅ 已完成（且已是出厂默认） |
 | 2. 断 AC 冷启动 | ✅ 已完成（卡 `UP_TIME` 已归零验证过） |
 | 3. **装 BFB** | ⬜ **待办 ← 本文** |
 | 4. ARM 起 OS 后，host PF 自动可用 | ⬜ |
 
 ### 两条关键结论
 
-1. **BFB 是走 rshim / SoC 管理口装的，与 `INTERNAL_CPU_MODEL` 无关** ——
-   两种模式下都能装。既然要 DPU 模式且已经设好，**直接装，不要再切模式。**
+1. **BFB 是走 rshim / SoC 管理口装的，与 DPU/NIC 模式开关
+   （`INTERNAL_CPU_OFFLOAD_ENGINE`）无关** ——
+   两种模式下都能装。既然要 DPU 模式且已经是 DPU 模式，**直接装，不要再切模式。**
 2. **装 BFB 不需要再断 AC** —— rshim 装 BFB 会让 SoC 自己从 rshim 引导一次完成安装。
    这是好消息：走 DPU 路线比走 NIC 路线**少付一次断电的代价**。
 
-> 对比：切模式（`INTERNAL_CPU_MODEL`）**必须**断 AC，因为它是上电锁存的；
-> 装 BFB **不需要**，因为它是通过 rshim 通道让 SoC 主动引导。
+> 对比：**切模式**（`INTERNAL_CPU_OFFLOAD_ENGINE`）官方要求
+> *"Arm and NIC components must undergo a reset. Power cycle is recommended."* ——
+> 推荐上电循环（本机实测 `INTERNAL_CPU_MODEL` 那条路径确实躲不过断电，见排查文档 §3.3）；
+> **装 BFB 不需要**，因为它通过 rshim 通道让 SoC 主动引导。
 
 ---
 
 ## 九、参考
 
 - [NVIDIA DOCA Downloads](https://developer.nvidia.com/doca-downloads) —— BF-bundle 下载入口
+- ⭐ [NVIDIA · BlueField Modes of Operation（DOCA 3.2.3）](https://networking-docs.nvidia.com/doca/archive/3-2-3/bluefield-modes-of-operation.md) —— **DPU/NIC 模式开关与判据的权威来源**；也解释了为什么 DPU 模式下 ARM 没系统时 host 驱动必然 `-110`
 - [BF-Bundle Installation and Upgrade（DOCA 3.2.3）](https://networking-docs.nvidia.com/doca/archive/3-2-3/bf-bundle-installation-and-upgrade.md) —— 安装步骤、`bf.cfg`、`doca-installer`、150W 供电与安全启动要求
 - [Deploying BlueField Software from Host（BSP 4.10）](https://docs.nvidia.com/networking/display/nvidia-bluefield-bsp-v4-10-0.0.pdf) —— 安全启动签名说明
 - [Mellanox/bfb-build](https://github.com/Mellanox/bfb-build/) —— 自建 BFB（**本卡不适用**）
