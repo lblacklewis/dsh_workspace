@@ -70,14 +70,26 @@ PCIE_HAS_VFIO=1 rshim -b pcie -f
 |---|---|---|
 | `bfb-install` | `/usr/sbin/bfb-install` | **主用** —— 装 BFB |
 | `bfb-tool` | `/usr/sbin/bfb-tool` | `extract` / `repack` / `info`，按 PSID 选载荷 |
-| `doca-installer` | 未装，**本地 DOCA 仓里有** `1.3.10-1` | 多卡并行装，支持 `--psid` 分组 |
+| `doca-installer` | `/usr/bin/doca-installer` ✅ **已装**（`1.3.10-1`，2026-11-10 离线装） | 多卡并行装，支持 `--psid` 分组 |
 | `rshim` | `/usr/sbin/rshim` | 用户态，直映射 BAR，不需要内核模块 |
 
-离线安装 doca-installer：
+`doca-installer` 已离线装好（走本地 `file:` 源，不动网络）：
 
 ```bash
-apt-get install -y doca-installer      # 走本地 file: 源
+apt-get install -y doca-installer      # 已完成
 ```
+
+已核实的参数（与官方文档一致）：
+
+```
+-b/--image-bundle    -r/--rshim        -c/--config-file    -p/--psid
+--exclude            --show-target-fw  --compare          --show-running-fw
+--show-doca-info     --runtime         --deferred         --activate
+--export-yaml
+```
+
+> 基线记录：`doca-installer --show-running-fw` 当前**返回空** ——
+> DPU 侧没有系统可应答。装完 BFB 后它应该能列出 ATF/UEFI/BMC/NIC FW 版本。
 
 ### ⚠️ 网络：BFB 拿不到，必须外部送进来
 
