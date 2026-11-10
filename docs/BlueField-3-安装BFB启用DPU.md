@@ -262,26 +262,49 @@ BF-bundle 会**覆盖整个引导分区**（装 Ubuntu 22.04）**并升级 BlueF
 
 ## 六、⚠️ 两个最容易卡住的点
 
-### 1. 150W 平台需要 ATX +12V 辅助供电
+### 1. ⛔ ATX +12V 辅助供电 —— **本机实测就卡在这里**（2026-11-10 确认）
 
 NVIDIA 文档明确写着：
 
 > **The ATF will not boot 150W BlueField-3 platforms if the ATX +12V power supply is not connected.**
 
-**症状**：安装输出停在
+**而且本卡 OPN 精确落在"必须外接"那一组**（BF3 平台用户指南 · Specifications）：
+
+| OPN 分组 | 供电要求 |
+|---|---|
+| B3140H / B3140L / B3220L / B3210L **SuperNIC** | 仅 PCIe x16 槽位 75W |
+| B3220 / B3240 / B3210 / **B3210E** DPU | ⚠️ **须外接 8-pin ATX 辅助供电** |
+
+> **B3210E DPUs Specifications**（原文）：
+> "**Requires a supplementary 8-pin ATX power supply connectivity available through
+> the external power supply connector.**"
+
+本卡 = `900-9D3B6-00CC-EA_Ax`（B3210E）→ **必须外接**。
+
+**2026-11-10 13:57 实测结果：⛔ 卡住了**（`bfb-install` 推流直接失败）：
 
 ```
-INFO[PSC]: PSC BL1 START
-INFO[BL2]: start
+Pushing bfb
+cat: write error: Connection timed out
+Error: Failed to push boot stream via local rshim
+...
+INFO[BL31]: MB ping success
+INFO[UEFI]: eMMC init
+INFO[UEFI]: eMMC probed
+ERR[BL31]: ATX missing - initiating halt sequence...
+ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
 ```
 
-然后**等不到 `INFO[BL31]`** —— ARM 根本没起来。
+> ⚠️ **更正**：本节原先写"BL 链能跑 → 大概率不缺这根线"，**是错的**。
+> BL1/BL2/BL31 会跑起来、`UP_TIME` 会走、`SW_RESET` 也有效 ——
+> 这些都发生在 CPU 域之前，**不需要那根线**。到 BL31(ATF) 才做电源检查然后 halt。
+> 我已经被这一点误导过一次，不要再被误导。
 
-**排查**：看卡上/机箱里那根 **+12V 辅助供电线**有没有接。
+**好消息**：失败没伤到卡（还没进到写 eMMC 的阶段，`安装动作计数: 0`），
+主机、rshim 通道、eMMC 原有内容都完好。
 
-- 本机证据：SoC 此前能被 rshim 读到 `UP_TIME`（4.66 天）、且 `SW_RESET` 真的重启了 SoC
-  → **BL 链是能跑的**，大概率不缺这根线
-- 但仍需在安装时留意，因为这是**文档写明的硬阻塞**
+**要做的**：把 **8-pin ATX(EPS 12V) 辅助供电线**接上（**不是** PCIe 6+2），再重跑 `bfb-install`。
+参考 [BF3 平台用户指南 · Pinouts Description](https://networking-docs.nvidia.com/bf3dpu/pinouts-description)。
 
 ### 2. 安全启动签名
 

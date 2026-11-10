@@ -122,7 +122,17 @@ ARM 不干活 → 页供给不上 → 固件永远停在 `pre-initializing (0x87
 ### 因果链全图
 
 ```
-BF3 配成 DPU 模式（BOOT_MODE=emmc，但 eMMC 里没有可启动的 BFB）
+⭐ 最深一层根因（2026-11-10 实测确认）：
+   本卡 900-9D3B6-00CC-EA_Ax = B3210E，NVIDIA 官方规格明写
+   「Requires a supplementary 8-pin ATX power supply connectivity」
+   而那根线**没接** → ATF/BL31 直接 halt：
+      ERR[BL31]: ATX missing - initiating halt sequence...
+      ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
+        ↓
+   ARM 根本起不来（跟有没有 OS 无关）→ ECPF 永不初始化
+        ↓
+═══════════════════════════════════════════════════
+BF3 配成 DPU 模式（BOOT_MODE=emmc，但 eMMC 里也没有可启动的 BFB）
         ↓
 ARM 侧没有任何 OS 在跑（console 静默 / bfdump Timeout / OPN_STR=N/A）
         ↓
@@ -132,10 +142,17 @@ host PF 的固件初始化需要 ECPF 供给 page + IB vport0 → 供给不上
         ↓
 probe 失败 → ip a 没有 / ibstat 没有     （mst 仍能看到，因为只需 PCI 配置空间）
         ↓
-【修复】mlxconfig 切 SEPARATED_HOST + 断电冷启动   ⚠️ 走的是**已弃用**参数，见 §3.2 更正
+【当时修复】mlxconfig 切 SEPARATED_HOST + 断电冷启动
+    ⚠️ 走的是已弃用参数（见 §3.2）；它之所以有效，是因为
+       NIC 模式下 Arm 核心本来就**不需要工作**，接不接那根线都不影响
         ↓
 mlx5_core 绑定成功 → enp59s0f0np0 / enp59s0f1np1 出现，ibstat 的 CA 数 4 → 6
 ```
+
+> ⚠️ **重要含义**：ATX 辅助供电没接 ⇒ **装 BFB 也救不了 DPU 模式**。
+> 2026-11-10 实测：`bfb-install` 推流直接失败（`cat: write error: Connection timed out`
+> → `Failed to push boot stream via local rshim`），连安装阶段都进不去。
+> 想用 DPU 功能，**必须先接 8-pin ATX 辅助供电线**（物理操作，软件无解）。详见 §6.9。
 
 ---
 
@@ -588,6 +605,67 @@ INTERNAL_CPU_OFFLOAD_ENGINE   ENABLED(0)
 > 想回到 B：`mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=DISABLED`
 > + **再断一次 AC**（官方推荐上电循环）。
 > ⚠️ **别再用 `INTERNAL_CPU_MODEL=SEPARATED_HOST`** —— 那是弃用参数，见 §3.2。
+
+---
+
+### 6.9 ⭐ 终极根因：ATX +12V 辅助供电未接（2026-11-10 实测确认）
+
+**NVIDIA 官方规格**（BF3 平台用户指南 · Specifications），本卡 OPN 精确命中：
+
+| OPN 分组 | 供电要求 |
+|---|---|
+| B3140H / B3140L / B3220L / B3210L **SuperNIC** | 仅 PCIe x16 槽位 **75W** |
+| B3220 / B3240 / B3210 / **B3210E** DPU | ⚠️ **须外接 8-pin ATX 辅助供电** |
+
+> **B3210E DPUs Specifications**（原文）：
+> "**Requires a supplementary 8-pin ATX power supply connectivity available through
+> the external power supply connector.**"
+
+本卡 = `900-9D3B6-00CC-EA_Ax`（B3210E）→ **属于必须外接的那一组**。
+
+**实测证据**（2026-11-10 13:57，`bfb-install` 尝试，rshim 日志原文）：
+
+```
+INFO[PSC]: PSC BL1 START
+INFO[BL2]: start
+INFO[BL2]: boot mode (rshim)
+INFO[BL2]: DDR POST passed
+INFO[BL2]: UEFI loaded
+INFO[BL31]: start
+INFO[BL31]: lifecycle GA Secured
+INFO[BL31]: runtime
+INFO[BL31]: MB ping success
+INFO[UEFI]: eMMC init
+INFO[UEFI]: eMMC probed
+ERR[BL31]: ATX missing - initiating halt sequence...
+ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
+```
+
+> ⚠️ **注意 BL1/BL2/BL31 全都跑起来了。**
+> 所以**千万别再用"BL 链能跑 / `UP_TIME` 会走 / `SW_RESET` 有效"来排除这根线**
+> —— 这些都发生在 CPU 域之前，根本不需要那根线。**到 BL31(ATF) 才做电源检查然后 halt。**
+> §六 里我先前正是这么误判的。
+
+**旁证（主机侧）**：
+
+| 检查 | 结果 | 含义 |
+|---|---|---|
+| `lspci` `DevSta` | `AuxPwr-`（`.0` 和 `.1` 都是） | PCIe Vaux 未检测到 |
+| `lspci` | `SlotPowerLimit 0.000W` | 槽位未声明供电上限 |
+| BMC `+12V` | `12 Volts ok` | 主机 12V 主轨正常（**不是**辅助口那一路） |
+| BMC `Sys_Total_Power` | `231 W` | 偏低，与 ARM 未运行一致 |
+| BMC `PCIe_NIC_Temp` | `61 °C` | 卡是通电的、在发热 |
+| eMMC 是否被写入 | `安装动作计数: 0` | ✅ **失败没伤卡**（还没进到写盘阶段） |
+
+**结论**：
+
+- ❌ 没接这根线 ⇒ **ARM 永远起不来 ⇒ DPU 模式永远不可能工作**，装 BFB 也救不了
+- ✅ 但 **NIC 模式不需要它** —— 这正是当初切 NIC 模式能修好、链路还能 100G up 的原因
+- ✅ 想上 DPU 功能：**必须先接 8-pin ATX 辅助供电线**（物理操作，软件无解）
+
+**这根线是什么**：卡上的外部供电连接器吃 **8-pin ATX(EPS 12V)**，
+**不是** PCIe 6+2。服务器上要从电源引一路空闲的 CPU 8-pin 供电过去。
+参考 [BF3 平台用户指南 · Pinouts Description](https://networking-docs.nvidia.com/bf3dpu/pinouts-description)。
 
 ---
 
