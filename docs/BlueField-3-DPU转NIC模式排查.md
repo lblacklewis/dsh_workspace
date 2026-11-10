@@ -369,10 +369,32 @@ ls /dev/rshim0/               # boot  console  misc  rshim
 - 所在槽位：`Slot03-NVMe0`（根端口 `0000:3a:00.0`，x16 PCI Express 3）
 - 网络配置：`LINK_TYPE_P1/P2 = ETH(2)`、`NUM_OF_PF = 2`
 
-### 6.6 顺带修好的
+### 6.6 `openibd.service` 的 `failed` 是**症状**，不是独立问题（2026-11-10 更正）
 
-`openibd.service` 原本是 **`failed`** 状态（inbox → OFED 驱动切换时的残留），
-`systemctl restart openibd` 后恢复 `enabled / active`。
+先前这里记为「inbox → OFED 驱动切换时的残留」，**不准确**。真实原因是**启动超时**：
+
+`openibd.service` 有 **180 秒**启动超时，而 BF3 故障时两个 PF 各要卡满 **120 秒**
+的 pre-init 等待（2×120s = 240s > 180s）→ 脚本**等不到设备就超时失败**：
+
+```
+Nov 10 11:58:27  openibd.service: Starting openibd - configure Mellanox devices...
+Nov 10 11:58:46  mlx5_core 0000:3b:00.0: Waiting for FW pre-initializing, timeout abort in 100s
+Nov 10 12:01:27  openibd.service: start operation timed out. Terminating.
+Nov 10 12:01:27  openibd.service: Failed with result 'timeout'.
+Nov 10 12:02:26  mlx5_core: probe of 0000:3b:00.1 failed with error -110
+```
+
+三次观测完全一致 —— **BF3 坏 → `failed`，BF3 好 → `active`，BF3 又坏 → 又 `failed`**：
+
+| 时间 | BF3 状态 | openibd |
+|---|---|---|
+| 11-05 修复前 | ❌ `-110` | `failed` |
+| 11-05 修复后 | ✅ 网卡正常 | `enabled / active` |
+| 11-10 还原后 | ❌ `-110` | `failed` |
+
+> **推论**：以后看到 `openibd` failed，**先查 Mellanox 卡的 dmesg 有没有 probe 失败**，
+> 别去查"驱动版本残留"。手动 `systemctl restart openibd` 之所以能"修好"，
+> 只是因为那时内核的 probe 早已失败完毕、脚本没有设备可等 —— **治标不治本**。
 
 ### 6.7 ⚠️ `BF_MODE` 在本卡上不可信 —— 别被它误导（重要更正）
 
@@ -416,19 +438,48 @@ const char* bf3_get_bf_mode(rshim_backend_t* bd) {
 > 顺带纠正另一个容易误读的字段：misc 里的 `SECURE_NIC_MODE` 取自 `bd->locked_mode`，
 > 是 **rshim 的归属锁（ownership lock）**，跟"网卡模式"毫无关系。
 
-**当前实测复核（2026-11-10）**：
+**实测：两个数据点证明它不跟随 `INTERNAL_CPU_MODEL`**（2026-11-10 补测）
+
+| 数据点 | `INTERNAL_CPU_MODEL` | `BF_MODE` | 网卡 |
+|---|---|---|---|
+| ① 11-05 切成 NIC 模式后 | `SEPARATED_HOST(0)` | **`DPU mode`** | ✅ 正常 |
+| ② 11-10 还原成 DPU 模式后 | `EMBEDDED_CPU(1)` | **`DPU mode`** | ❌ 消失 |
+
+**同一个 `BF_MODE` 值对应两种截然不同的模式** —— 足以排除它作为模式判据。
+含义：ARM 无系统时这个寄存器恒为其默认值 `DPU mode`，与 `INTERNAL_CPU_MODEL` 无关。
+
+> 顺带说明 `UP_TIME` 的正确用法：**温重启（`reboot`）不会让它归零**。
+> 2026-11-09 16:34 主机重启过一次（主机 `uptime` 只 19 小时），DPU 的 `UP_TIME`
+> 仍是 4.66 天 —— 说明卡一直带电。2026-11-10 断电后它归零到 543s（≈9 分钟，
+> 与上电时刻吻合）—— **只有归零才证明卡真的断过电**，这是判断"冷启动是否真发生"的铁证。
+
+### 6.8 ⭐ A/B/A 对照实验：因果性已被证实
+
+2026-11-10 的一次「还原 → 冷启动」意外构成了一次完整对照实验，
+把结论从「改了 X 就好了」升级为**「反复拨动 X，症状精确跟随」**：
+
+| | `INTERNAL_CPU_MODEL` | 是否冷启动 | `enp59` 网卡 | `ibstat` CA 数 | dmesg |
+|---|---|---|---|---|---|
+| **A**　11-05 修复前 | `EMBEDDED_CPU(1)` | — | ❌ 无 | 4 | `-110` |
+| **B**　11-05 修复后 | `SEPARATED_HOST(0)` | ✅ 断 AC | ✅ 有，100G up | 6 | 正常 |
+| **A'** 11-10 还原后 | `EMBEDDED_CPU(1)` | ✅ 断 AC | ❌ 无 | 4 | `-110` |
+
+三点全部吻合，并且**排除了「其实只是冷启动的功劳」这一竞争假设** —— 因为 A' 同样冷启动了。
+
+同时验证了：那 4 个派生参数在切回 DPU 模式时**会自己回来**，无需手工恢复。
+A' 实测与 BEFORE 快照逐字一致：
 
 ```
-INTERNAL_CPU_MODEL   SEPARATED_HOST(0)          ← flash 里确实是 NIC 模式
-3b:00.0/.1        -> mlx5_core                  ← PF 正常绑定
-enp59s0f1np1         UP  100000Mb/s  carrier=1  ← 链路正常
-BF_MODE              DPU mode                   ← ⚠️ 残留值，忽略
-UP_TIME              403079(s) ≈ 4.66 天        ← 自 11-05 冷启动起未再断电
+INTERNAL_CPU_PAGE_SUPPLIER    ECPF(0)
+INTERNAL_CPU_ESWITCH_MANAGER  ECPF(0)
+INTERNAL_CPU_IB_VPORT0        ECPF(0)
+INTERNAL_CPU_OFFLOAD_ENGINE   ENABLED(0)
 ```
 
-> 注意 `UP_TIME` 的用法：**温重启（`reboot`）不会让它归零**。
-> 2026-11-09 16:34 主机重启过一次（`uptime` 只 19 小时），但 DPU 的 `UP_TIME`
-> 仍是 4.66 天 —— 说明卡一直带电。**只有它归零才证明卡真的断过电。**
+> ⚠️ 还原很容易，但**每切一次都要付一次断 AC 的代价**。
+> 本文写作时该机器处于 **A' 状态（DPU 模式，网卡不可用）**。
+> 想回到 B：`mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_MODEL=SEPARATED_HOST`
+> + **再断一次 AC**。
 
 ---
 
