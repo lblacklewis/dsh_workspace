@@ -17,6 +17,18 @@
 >
 > ⭐ **但本文第六节第 1 条（ATX）现在对两条路都适用** ——
 > **官方 NIC 模式路径同样需要那根线**（实测见排查文档 §6.9 / §6.10）。
+>
+> ## 🟢 2026-11-10 16:20 更新：**ATX 的作用已被另一台机器正面验证**
+>
+> 用户提供的对照机 `10.17.20.237`（已接 8-pin ATX、同型号 BF3、同 FW `32.47.1088`）
+> 上，引导链**完整跑通、没有任何 ATX 报错**，一路走到
+> `UEFI: PCIe enum end` / `Secure Boot` / `Redfish enabled`；
+> 而老机器在同一位置报 `ERR[BL31]: ATX missing` → `ATX power not detected! Halting system!!`。
+>
+> ⇒ **"ATX 未接"这个阻塞已被证实**，本文第六节第 1 条的结论成立。
+> ⚠️ 而且对照机还演示了：**ATX 已接 + Arm 有系统 ⇒ host PF 正常起来、netdev 出现**，
+> 即 DPU 模式本身没问题 —— 前提是 **Arm 必须真的引导起系统**。
+> 完整对照日志见 [`BlueField-3-DPU转NIC模式排查.md` §6.11](BlueField-3-DPU转NIC模式排查.md)。
 
 ---
 
@@ -330,6 +342,19 @@ ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
 > **结论：想同时拿到「`OFFLOAD_ENGINE` 参数可见」+「网卡可用」，同样必须接这根线。**
 > 唯一能绕过它的是弃用的 `SEPARATED_HOST`，代价是 `OFFLOAD_ENGINE` 从配置里消失。
 > 完整实验记录见排查文档 §6.10。
+>
+> ⭐ **2026-11-10 16:20 补：这条结论已被对照机正面证实。**
+> 对照机 `10.17.20.237`（**已接 8-pin ATX**）的 BL31 **没有任何 ATX 报错**，
+> 一路走到 `UEFI: PCIe enum end` / `Redfish enabled` / 认到 `A78 16 Cores`；
+> 老机器同一位置则 halt。⇒ **接线就是那个缺失条件**（对照日志见排查文档 §6.11(1)）。
+>
+> ⚠️ **同时修正一条旧旁证**：`lspci` 的 `AuxPwr-` / `SlotPowerLimit 0W`
+> 在**接线与没接线**的机器上**完全相同** ⇒ **不能用来判断这根线接没接**。
+> 唯一判据是 **BL31 日志里有没有 `ATX missing` / `ATX power not detected!`**。
+>
+> ⚠️ **还有一个前提**：对照机 eMMC 里**本来就有系统**（无需装 BFB），
+> **Arm 引导起系统之后** host PF 才起来。所以接上 ATX 后若 PF 仍不来，
+> 先确认 Arm 是否真的在跑系统，再考虑装 BFB。
 
 ### 2. 安全启动签名
 

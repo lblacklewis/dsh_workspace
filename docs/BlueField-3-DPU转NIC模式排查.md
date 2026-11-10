@@ -23,12 +23,31 @@
 >
 > | 方案 | `OFFLOAD_ENGINE` 可见 | 网卡可用 | 代价 |
 > |---|---|---|---|
-> | **A. 接 8-pin ATX 辅助供电线** | ✅ | ✅ | 开箱接线（**EPS 12V 8-pin，不是 PCIe 6+2**） |
+> | **A. 接 8-pin ATX 辅助供电线** ⭐ **已被对照机正面验证（§6.11）** | ✅ | ✅ | 开箱接线（**EPS 12V 8-pin，不是 PCIe 6+2**） |
 > | B. 回退弃用的 `SEPARATED_HOST` | ❌ 参数会消失 | ✅ | 走 §3.2b 老路，11-05 验证过 |
 > | C. 拔卡 / BIOS 屏蔽该槽 | — | — | 顺带根治「开机 4 分钟所有 Mellanox 网卡消失」 |
 >
 > ⚠️ 首版标的「✅ 已修复」**只对 11-05 那次（弃用参数路径）成立**，现在不成立，故已作废。
 > ⚠️ 首版还写过「NIC 模式不需要那根 ATX 线」—— **对官方路径而言是错的**，见 §6.9 / §6.10。
+>
+> ## 🟢 2026-11-10 16:20 重大更新：ATX 的作用已被**另一台机器正面验证**
+>
+> 用户提供了一台**已接好 8-pin ATX** 的同型号机器（`10.17.20.237`）。在那台机器的 SoC 上
+> 下发 `SW_RESET` 后，引导链**完整跑通、没有任何 ATX 报错**：
+>
+> | 阶段 | 老机器 `10.17.21.85`（**没接线**） | 对照机 `10.17.20.237`（**接了线**） |
+> |---|---|---|
+> | `BL31: runtime` / `MB ping success` | ✅ | ✅ |
+> | `UEFI: eMMC init` / `eMMC probed` | ✅ | ✅ |
+> | **ATX 电源检查** | ❌ `ERR[BL31]: ATX missing - initiating halt sequence...`<br>❌ `ASSERT[BL31]: ATX power not detected! Halting system!!` | ✅ **完全没有报错** |
+> | `UEFI: UPVS valid` → `PCIe enum` → `Secure Boot` → `Redfish enabled` | ⛔ 停在 halt，到不了 | ✅ 全部走完 |
+>
+> ⇒ **方案 A（接 8-pin ATX）不再是推断，而是已被另一台机器证实。**
+> 对照机甚至还演示了完整闭环：**ATX 已接 + Arm 有系统 ⇒ host PF 正常起来、netdev 出现**。
+> 详见 **§6.11**（完整对照日志 · 对照机档案 · 一个新故障模式 · 一个新恢复手法）。
+>
+> ⚠️ 同时修正一条旧旁证：`lspci` 的 `AuxPwr-` / `SlotPowerLimit 0W`
+> **在接线与没接线的机器上完全一样** ⇒ **与 8-pin ATX 无关，不能用来判断**（见 §6.11(2)）。
 
 ---
 
@@ -738,19 +757,21 @@ ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
 > —— 这些都发生在 CPU 域之前，根本不需要那根线。**到 BL31(ATF) 才做电源检查然后 halt。**
 > §六 里我先前正是这么误判的。
 
-**旁证（主机侧）**：
+**旁证（主机侧 —— ⚠️ 2026-11-10 16:20 被 §6.11(2) 推翻，仅作历史记录）**：
 
 | 检查 | 结果 | 含义 |
 |---|---|---|
-| `lspci` `DevSta` | `AuxPwr-`（`.0` 和 `.1` 都是） | PCIe Vaux 未检测到 |
-| `lspci` | `SlotPowerLimit 0.000W` | 槽位未声明供电上限 |
+| `lspci` `DevSta` | `AuxPwr-`（`.0` 和 `.1` 都是） | ⚠️ **无效旁证** —— 接了线的对照机同样显示 `AuxPwr-` |
+| `lspci` | `SlotPowerLimit 0.000W` | ⚠️ **无效旁证** —— 对照机同样如此 |
 | BMC `+12V` | `12 Volts ok` | 主机 12V 主轨正常（**不是**辅助口那一路） |
 | BMC `Sys_Total_Power` | `231 W` | 偏低，与 ARM 未运行一致 |
 | BMC `PCIe_NIC_Temp` | `61 °C` | 卡是通电的、在发热 |
 | eMMC 是否被写入 | `安装动作计数: 0` | ✅ **失败没伤卡**（还没进到写盘阶段） |
 
-**结论（2026-11-10 晚二次更正）**：
+**结论（2026-11-10 晚二次更正 · 16:20 由 §6.11 对照机正面验证）**：
 
+- ✅ **【已被实测证明】** 接了线的对照机引导链**完整跑通、无任何 ATX 报错**（§6.11(1)）
+  ⇒ **这根线就是那个物理阻塞**，不再是推断
 - ❌ 没接这根线 ⇒ **ARM 永远起不来 ⇒ DPU 模式永远不可能工作**，装 BFB 也救不了
 - ⚠️ **更正**：首版这里写的"NIC 模式不需要它"——**只对弃用的 `SEPARATED_HOST` 路径成立**。
   **官方的 `INTERNAL_CPU_OFFLOAD_ENGINE=DISABLED` 路径同样需要它**（§6.10 有实测为证）：
@@ -892,20 +913,198 @@ rshim 启动后会多出一张 `tmfifo_net0`（TMFIFO = Tiny Management FIFO）�
 
 ---
 
+### 6.11 ⭐⭐ ATX 铁证：同型号机器 A/B 对照（2026-11-10 16:12）
+
+用户提供了一台**据称已接 8-pin ATX** 的机器（`10.17.20.237`）。对它的 SoC 下发一次
+`SW_RESET` 后，拿到了**完整、无 ATX 报错**的引导日志 —— 与老机器逐行对照，
+**ATX 就是唯一差异**。
+
+#### (1) 对照日志（同一段 BL/UEFI 代码，同一 FW 版本 `32.47.1088`）
+
+| 阶段 | 老机器 `10.17.21.85`（**没接线**） | 对照机 `10.17.20.237`（**接了线**） |
+|---|---|---|
+| `INFO[PSC]: PSC BL1 START` | ✅ | ✅ |
+| `INFO[BL2]: DDR POST passed` / `UEFI loaded` | ✅ | ✅ |
+| `INFO[BL31]: start` / `lifecycle GA Secured` | ✅ | ✅ |
+| `INFO[BL31]: runtime` / `MB ping success` | ✅ | ✅ |
+| `INFO[UEFI]: eMMC init` / `eMMC probed` | ✅ | ✅ |
+| **ATX 电源检查** | ❌ `ERR[BL31]: ATX missing - initiating halt sequence...`<br>❌ `ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!` | ✅ **完全没有报错** |
+| `INFO[UEFI]: UPVS valid` | ⛔ 到不了 | ✅ |
+| `INFO[UEFI]: PCIe enum start` / `end` | ⛔ | ✅ |
+| `INFO[UEFI]: UEFI Secure Boot (disabled)` / `PK configured` | ⛔ | ✅ |
+| `INFO[UEFI]: Redfish enabled` / `DPU-BMC RF credentials found` | ⛔ | ✅ |
+| console 上认出 SoC | ⛔ | ✅ `Mellanox BlueField-3 [A1] A78(D42) 16 Cores r0p1` |
+
+> ⭐ 这就是「**ATX 未接 = 唯一物理阻塞**」的**正面证明**，不再是推断。
+> 也再次印证 §6.9 的机制：ATF(BL31) 会先跑起来（所以 `BF_MODE` 可读、`UP_TIME` 会走），
+> **到 ATX 检查那一步才 halt。**
+
+#### (2) 对照机档案（留档备查）
+
+| 项 | 对照机 `10.17.20.237` | 老机器 `10.17.21.85` |
+|---|---|---|
+| 主机 | hostname `ubuntu`，Ubuntu 24.04，kernel `6.8.0-147-generic` | `node20-39`，Ubuntu 22.04，`5.15.0-105` |
+| BF3 PCI 位置 | **`99:00.0` / `99:00.1`**（+ `99:00.2` SoC mgmt） | `3b:00.0` / `3b:00.1` |
+| OPN / PSID | `900-9D3B6-00SV-A_Ax` / `MT_0000000965` | `900-9D3B6-00CC-EA_Ax` / `MT_0000001115` |
+| FW | `32.47.1088` | `32.47.1088` |
+| PCIe 链路 | ✅ **32 GT/s (Gen4) x16**，`504.112 Gb/s` | ⚠️ 降级 `8 GT/s (Gen3) x16` |
+| 模式 | **DPU 模式**（`OFFLOAD_ENGINE=ENABLED(0)`，出厂态、从未改过） | 已改 NIC 模式 |
+| rshim | `2.5.11`，`active` **且 `enabled`** | 同版本但 **disabled** |
+| `lspci` `AuxPwr` | `AuxPwr-` | `AuxPwr-` ← ⚠️ **两边一模一样** |
+| 网卡（恢复后） | ✅ `ens21f0np0` / `ens21f1np1` + `mlx5_0` / `mlx5_1` | ❌ 无 |
+
+> ⚠️ **重要修正（推翻 §6.9 的一条旁证）**：
+> `lspci` 的 `DevSta: AuxPwr-` 与 `SlotPowerLimit 0.000W`
+> **在"接了线"和"没接线"的两台机器上完全相同** ⇒ 那是 PCIe 的 3.3Vaux 状态，
+> **与 8-pin ATX(+12V) 无关，不能作为判断依据。**
+> **唯一可信的判据：BL31 有没有 `ATX missing` / `ATX power not detected!`。**
+
+#### (3) 附带确认：`BF_MODE` 跟随 `INTERNAL_CPU_OFFLOAD_ENGINE`（第三个独立数据点）
+
+对照机复位前 `BF_MODE = Unknown`，`SW_RESET` 之后变成 **`DPU mode`** ——
+而它的配置正是 `INTERNAL_CPU_OFFLOAD_ENGINE=ENABLED(0)`（出厂 DPU 态）。
+⇒ 与 §6.7 结论一致，**又一台机器上验证通过**。
+
+#### (4) ⭐ 新发现：DPU 模式下，**Arm 一跑起来 host PF 就起来了**
+
+对照机走完了一个完整闭环，值得记住：
+
+```
+15:36:07   ⚠️ 有人往 /dev/rshim0/boot 推引导流，撞上 mlx5_core 的复位  → 见 (5)
+~15:36     mlx5_core teardown，两个 PF 的 netdev 全部消失
+16:04      ip -br link 只剩 lo/ens3f0/ens3f1/tmfifo_net0；ibstat -l 空
+16:12:13   ★ 对 SoC 下发 SW_RESET
+16:13:54   ✅ mlx5_core 0000:99:00.0: health recovery succeeded → ens21f0np0
+16:13:57   ✅ mlx5_core 0000:99:00.1: health recovery succeeded → ens21f1np1
+```
+
+**两条结论：**
+
+1. ⭐ **DPU 模式 + ATX 已接 + Arm 有系统（eMMC 里本来就有，无需装 BFB）
+   ⇒ host PF 正常初始化、netdev 出现。**
+   （驱动是走 `mlx5_health_try_recover` → `mlx5_pci_slot_reset` 重新 init 一遍才拿到的。）
+2. ⚠️ **`INTERNAL_CPU_MODEL=EMBEDDED_CPU` 下，Arm 必须真的启动到能"交班"。**
+   对照机在 Arm 还停在 UEFI、eMMC 系统没起来时，PF 一直卡在 `wait_fw_init`；
+   **系统一起来 PF 立刻就好。** 这是老机器"接上 ATX 之后还需要什么"的直接参考。
+
+> ⚠️ 但对照机 eMMC 里**本来就有系统**（同事确认一直好用、无需装 BFB）。
+> **老机器 eMMC 里有没有系统尚未确认** —— 接上 ATX 后若 PF 仍不来，
+> 下一步就查 Arm 是否真的引导了系统（`OPN_STR` 是否还是 `N/A`、console 有没有 Linux 启动）。
+
+#### (5) ⭐ 新故障模式：「推流撞车」会让**所有 BF3 网卡瞬间消失**
+
+对照机 15:36 的故障现场（`dmesg -T`，绝对时间）：
+
+```
+[Tue Nov 10 15:36:07] mlx5_core 0000:99:00.1: SW reset semaphore is already in use   ← ★ 关键
+[Tue Nov 10 15:36:07] mlx5_core 0000:99:00.1: handling bad device here
+[Tue Nov 10 15:36:07] mlx5_core 0000:99:00.1: mlx5_handle_bad_state: starting teardown
+[Tue Nov 10 15:36:07] mlx5_core 0000:99:00.1: mlx5_error_sw_reset: start / end
+[Tue Nov 10 15:36:08] mlx5_core 0000:99:00.0: starting health recovery flow
+[Tue Nov 10 15:36:08] rshim[2738]: rshim0 boot open      ← 有人推引导流（写 /dev/rshim0/boot）
+[Tue Nov 10 15:36:11] rshim[2738]: rshim0 boot close     ← 3 秒就断 = 推流失败
+```
+
+**机制**：rshim 推引导流要复位 SoC/设备，而 `mlx5_core` 也在复位路径上
+（被判定异常的卡会走 `mlx5_error_sw_reset`）——
+**两者抢同一个 SW reset 信号量**，卡被拖进"坏设备"流程 teardown，**netdev 全没**。
+
+> ⭐ 这与老机器"开机 4 分钟无网卡"（§6.10(4) 的串行等待）**机制不同，别混为一谈**。
+> 判据：`dmesg` 里有没有 **`SW reset semaphore is already in use`**。
+
+#### (6) ⭐⭐ 新恢复手法：`SW_RESET` 能救回"推流撞车"僵死的卡
+
+```bash
+# 救活僵死的 BF3（实测约 100 秒后 netdev / RDMA 全部回来）
+echo "SW_RESET 1" > /dev/rshim0/misc
+```
+
+⚠️ 但它**不是万能的**，适用范围必须收窄：
+
+| 故障 | `SW_RESET` 有用吗 |
+|---|---|
+| 推流撞车 ⇒ `mlx5_core` teardown、netdev 消失 | ✅ **有用**（对照机 16:12 实测，100s 后 `health recovery succeeded`） |
+| ATX 未接 ⇒ BL31 halt | ❌ **没用**（老机器试过，改变不了 halt） |
+
+> ⚠️ **所以本文早先"`SW_RESET` 没用"的说法要收窄** ——
+> 它救不了 **ATX 缺线**，但**能救"推流撞车 / 驱动僵死"**。
+> 判断顺序：**先看 BL31 有没有 ATX 报错，再看是不是撞车。**
+
+#### (7) 尚未解释的差异：`wait_fw_init` 超时 120s vs ~5700s
+
+| 机器 | `wait_fw_init` 超时 | FW | 并行/串行 |
+|---|---|---|---|
+| 老机器 `10.17.21.85` | **120 s**（两个 PF 串行 = 240 s） | `32.47.1088` | 串行 |
+| 对照机 `10.17.20.237` | ⚠️ **~5700 s（≈95 分钟）** | `32.47.1088` | **并行**（两条日志同步打印） |
+
+**FW 版本相同、超时差 47 倍 —— 原因未确认。**
+运维含义：对照机开机后 BF3 的 PF 会阻塞约 95 分钟；不过那台机器**只有这张 Mellanox 卡**
+（没有 CX7/CX5 在后面排队），影响面比老机器小得多。
+`/sys/module/mlx5_core/parameters/fw_init_timeout` 在该机读出来是**空值**，
+超时来源未定（FW 上报 / 模块参数 / DOCA 版本差异皆有可能）。**留待查证，不凭猜下结论。**
+
+#### (8) 本轮在对照机上做过什么（如实留痕）
+
+| 操作 | 说明 | 破坏性 |
+|---|---|---|
+| 只读侦察若干轮 | `mst status -v`、`mlxconfig -e q`、`dmesg`、`journalctl`、`dd if=/dev/rshim0/misc … iflag=nonblock` | 否 |
+| `mst start` | 加载 MST 模块、暴露 `/dev/mst/*` | 否 |
+| 写 `DISPLAY_LEVEL 2` → 读 → 还原 `0` | 只提升 `/dev/rshim0/misc` 的日志显示级别（**不是** flash 配置） | 否（已还原） |
+| **写 `SW_RESET 1`** | ⭐ 复位 SoC。**本轮唯一的破坏性操作**，在发现 PF 卡死后作为排障手段下发；**结果把机器修好了** | ⚠️ 是（已恢复） |
+
+> ⚠️ 两个操作陷阱（都踩过）：
+> 1. `cat /dev/rshim0/misc` 是**阻塞设备、永不返回 EOF** —— 必须用
+>    `dd … bs=262144 count=1 iflag=nonblock`，否则会把排障脚本挂死
+>    （`timeout` 也杀不掉 D 状态的读，还会把 ssh 通道一起占住）。
+> 2. `DISPLAY_LEVEL=0` 时 `misc` 里的 `Log Messages` 段是**空的** ——
+>    要看到引导日志，必须先提到 `DISPLAY_LEVEL 2`。
+
+---
+
 ## 七、如果冷启动后仍然 -110
 
 > ⚠️ **2026-11-10 更新：这个情况已经真实发生过了** —— 官方路径 + 断 AC 冷启动后
 > **依然是 `-110`**，而**结论不是固件损坏，是 ATX 辅助供电未接**（见 §6.9 / §6.10）。
 > **所以别急着刷固件 —— 先确认那根 8-pin ATX 线接了没有。**
 
-**正确的排查顺序：先排物理，再排固件。**
+**正确的排查顺序：先排物理，再排"驱动僵死"，最后才排固件。**
 
-1. **先看卡自己怎么说 ATX**：`cat /dev/rshim0/misc`（或看 rshim 日志）里有没有
+0. **⭐ 先把日志级别打开再读 `misc`** —— `DISPLAY_LEVEL=0` 时 `Log Messages` 段是**空的**，
+   看不到引导链（§6.11(8)）：
+
+   ```bash
+   echo "DISPLAY_LEVEL 2" > /dev/rshim0/misc      # 提到 log 级别
+   dd if=/dev/rshim0/misc of=/tmp/misc.txt bs=262144 count=1 iflag=nonblock
+   cat /tmp/misc.txt                              # 现在才有 BL1/BL2/BL31/UEFI 日志
+   echo "DISPLAY_LEVEL 0" > /dev/rshim0/misc      # 用完还原
+   ```
+
+   ⚠️ **必须用 `dd … iflag=nonblock`** —— `cat /dev/rshim0/misc` 会**永远阻塞**
+   （该字符设备不返回 EOF，`timeout` 也杀不掉 D 状态的读）。
+
+1. **看卡自己怎么说 ATX**：上面日志里有没有
    `ERR[BL31]: ATX missing` / `ATX power not detected! Halting system!!`
-   —— **有 ⇒ 先接线，刷任何固件都没用。**
-2. **再确认模式真的已生效**：`mlxconfig -d <dev> -e q` 看 **`Current` 列**
+   —— **有 ⇒ 先接那根 8-pin ATX，刷任何固件都没用。**
+   ⚠️ **别再用 `lspci` 的 `AuxPwr-` / `SlotPowerLimit` 判断** —— 接了线也一样（§6.11(2)）。
+
+2. **⭐ 没有 ATX 报错、但 netdev 全没了 ⇒ 先怀疑"推流撞车"**：
+
+   ```bash
+   dmesg -T | grep "SW reset semaphore"     # 有 "is already in use" 就是撞车（§6.11(5)）
+   ```
+
+   解药是复位 SoC（§6.11(6)，实测约 100 秒后 netdev / RDMA 全部回来）：
+
+   ```bash
+   echo "SW_RESET 1" > /dev/rshim0/misc
+   ```
+
+3. **确认模式真的已生效**：`mlxconfig -d <dev> -e q` 看 **`Current` 列**
    （**不是** `Next Boot` 列），以及 `/dev/rshim0/misc` 的 `BF_MODE`。
-3. **前两条都确认无误后，才轮到怀疑固件**，按顺序退：
+   ⚠️ 即使模式、`BF_MODE` 全对，**Arm 没启动到能"交班"之前 PF 也不会来**（§6.11(4)）——
+   DPU 模式下要确认 Arm 真的把 eMMC 里的系统引导起来了。
+
+4. **前三条都确认无误后，才轮到怀疑固件**，按顺序退：
 
    - **重刷固件**：`flint -d /dev/mst/mt41692_pciconf0 -i <fw.bin> burn`
      （需匹配 PSID `MT_0000001115` 的固件包）
