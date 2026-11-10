@@ -1,11 +1,34 @@
 # BlueField-3 从 DPU 模式切回 NIC 模式 —— 排查与操作记录
 
-> **日期**：2026-11-05
+> **日期**：2026-11-05（首版）· 2026-11-10（两次重要更正 + 官方路径实测）
 > **主机**：`node20-39`（`10.17.21.85`，Ubuntu 22.04.4 LTS，kernel `5.15.0-105-generic`，DOCA/OFED 3.2.2）
 > **登录**：`root` / 密码见密码管理器（**不要写进仓库**）
-> **结论**：✅ **已修复**。BF3 现为双口 100GbE 网卡，`enp59s0f1np1` 以 100 Gb/s 上线。
 >
-> ⚠️ **但修复用的参数后来发现是 NVIDIA 已弃用的** —— 见下方更正框。
+> ## 🔴 当前状态（2026-11-10 15:35）：**卡不可用，等用户决策**
+>
+> | 层面 | 实测值 | 结论 |
+> |---|---|---|
+> | flash（`Next Boot` 列） | `OFFLOAD_ENGINE=DISABLED(1)` + 三个 `EXT_HOST_PF(1)` | **NIC 模式** |
+> | 运行中（`Current` 列） | 同上（已断电冷启动锁定） | **NIC 模式** ✅ |
+> | 卡侧寄存器（`BF_MODE`） | **`NIC mode`** | ATF 已认账 ✅ |
+> | **host PF** | ❌ `-110`（`wait_fw_init` 120s 超时） | **网卡不出现** |
+> | `mlxconfig q INTERNAL_CPU_OFFLOAD_ENGINE` | `DISABLED(1)` | **参数可见** ✅ 用户要求①已满足 |
+>
+> **配置这条路已经走到头了 —— 三个层面全是 NIC 模式，PF 依然起不来。**
+> 剩下的唯一物理阻塞是 **8-pin ATX +12V 辅助供电未接**（卡自报
+> `ATX power not detected! Halting system!!`），而且**官方 NIC 模式路径同样需要它**
+> —— 见 §6.9 与 §6.10。
+>
+> **待决三选一**（用户 2026-11-10 15:35 选择「先别动，我再想想」）：
+>
+> | 方案 | `OFFLOAD_ENGINE` 可见 | 网卡可用 | 代价 |
+> |---|---|---|---|
+> | **A. 接 8-pin ATX 辅助供电线** | ✅ | ✅ | 开箱接线（**EPS 12V 8-pin，不是 PCIe 6+2**） |
+> | B. 回退弃用的 `SEPARATED_HOST` | ❌ 参数会消失 | ✅ | 走 §3.2b 老路，11-05 验证过 |
+> | C. 拔卡 / BIOS 屏蔽该槽 | — | — | 顺带根治「开机 4 分钟所有 Mellanox 网卡消失」 |
+>
+> ⚠️ 首版标的「✅ 已修复」**只对 11-05 那次（弃用参数路径）成立**，现在不成立，故已作废。
+> ⚠️ 首版还写过「NIC 模式不需要那根 ATX 线」—— **对官方路径而言是错的**，见 §6.9 / §6.10。
 
 ---
 
@@ -37,6 +60,25 @@ mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=ENABLE
 
 **本文其它部分（故障链条、证据、硬件清单、冷启动验证、A/B/A 实验）都仍然有效** ——
 只有"用哪个参数切模式 / 怎么判断当前模式"这两条需要更正。详见 §3.2 与 §6.7。
+
+### ⚠️⚠️ 追加更正（2026-11-10 晚）：官方路径**没能**修好本卡
+
+光把 `INTERNAL_CPU_OFFLOAD_ENGINE` 改成 `DISABLED`，**不足以**让本卡的网卡回来：
+
+| 尝试时刻 | 配置 | 冷启动 | 结果 |
+|---|---|---|---|
+| 11-10 14:23 | 只 `OFFLOAD_ENGINE=DISABLED` | ✅ 15:16 断 AC | ❌ 仍 `-110`（但 `BF_MODE` 已变 `NIC mode`） |
+| 11-10 14:41 | 再补 `PAGE_SUPPLIER` / `ESWITCH_MANAGER` / `IB_VPORT0` = `EXT_HOST_PF(1)` | ✅ 15:16 断 AC | ❌ 仍 `-110` |
+
+**不是参数选错了，而是物理供电没到位**（ATX 未接）。
+
+⚠️ **所以本文档的正确读法变了：**
+
+- 官方 `INTERNAL_CPU_OFFLOAD_ENGINE` 是 **"必要不充分" 条件** ——
+  它能满足"参数可见"，但**本卡还差接那根 ATX 线**才可能让网卡回来；
+- 11-05 之所以用弃用参数能修好，是因为 `SEPARATED_HOST` 把"内嵌 CPU 掌管网卡"这条路
+  **整个删掉**，绕过了 Arm 与 PF 的交接 —— 代价是 `OFFLOAD_ENGINE` 一起消失。
+  详见 §6.10 的机制分析。
 
 来源：[NVIDIA · BlueField Modes of Operation（DOCA 3.2.3）](https://networking-docs.nvidia.com/doca/archive/3-2-3/bluefield-modes-of-operation.md)
 
@@ -83,15 +125,31 @@ mlx5_core: probe of 0000:3b:00.0 failed with error -110
 
 ### 证据链
 
-**1. 卡在 DPU 模式**（两条独立途径互相印证）
+**1. 卡在 DPU 模式**（⭐ 用 NVIDIA 官方判据，2026-11-10 更正）
 
 ```bash
-mlxconfig -d /dev/mst/mt41692_pciconf0 q | grep INTERNAL_CPU_MODEL
-#   INTERNAL_CPU_MODEL           EMBEDDED_CPU(1)          ← DPU 模式
-
-cat /dev/rshim0/misc | grep BF_MODE
-#   BF_MODE                      DPU mode
+mlxconfig -d /dev/mst/mt41692_pciconf0 q INTERNAL_CPU_OFFLOAD_ENGINE
+#   INTERNAL_CPU_OFFLOAD_ENGINE                 ENABLED(0)     ← ★ 官方判据：DPU 模式
 ```
+
+> ⚠️ **首版这里写的是 `INTERNAL_CPU_MODEL = EMBEDDED_CPU` → 错。**
+> `INTERNAL_CPU_MODEL` 的出厂默认值**本来就是 `EMBEDDED_CPU(1)`**（`mlxconfig -e q` 的
+> `Default` 列实测确认），它**不是模式指示器**。详见 §6.7。
+
+当时 `BF_MODE` 也显示 `DPU mode`，与上式一致（但它的可信边界见 §6.7）。
+
+**DPU 模式下的完整配置快照**（`mlxconfig -e q`，三列语义见 §6.10）：
+
+```
+Configurations:                        Default          Current           Next Boot
+        INTERNAL_CPU_MODEL             EMBEDDED_CPU(1)  EMBEDDED_CPU(1)   EMBEDDED_CPU(1)
+        INTERNAL_CPU_PAGE_SUPPLIER      ECPF(0)          ECPF(0)           ECPF(0)
+        INTERNAL_CPU_ESWITCH_MANAGER    ECPF(0)          ECPF(0)           ECPF(0)
+        INTERNAL_CPU_IB_VPORT0          ECPF(0)          ECPF(0)           ECPF(0)
+        INTERNAL_CPU_OFFLOAD_ENGINE     ENABLED(0)       ENABLED(0)        ENABLED(0)
+```
+
+> ⭐ **`Default` 列 = DPU 模式** ⇒ 这张卡**出厂就是 DPU 模式**，与它是 DPU SKU（B3210E）吻合。
 
 **2. ARM 侧没有系统在跑**（三条独立证据）
 
@@ -142,12 +200,25 @@ host PF 的固件初始化需要 ECPF 供给 page + IB vport0 → 供给不上
         ↓
 probe 失败 → ip a 没有 / ibstat 没有     （mst 仍能看到，因为只需 PCI 配置空间）
         ↓
-【当时修复】mlxconfig 切 SEPARATED_HOST + 断电冷启动
-    ⚠️ 走的是已弃用参数（见 §3.2）；它之所以有效，是因为
-       NIC 模式下 Arm 核心本来就**不需要工作**，接不接那根线都不影响
+【11-05 当时修复】mlxconfig 切 SEPARATED_HOST + 断电冷启动
+    ⚠️ 走的是已弃用参数（见 §3.2）。它之所以能**在没有 ATX 供电时**也修好，
+       是因为 SEPARATED_HOST 把「内嵌 CPU 掌管网卡」这条路整个删掉，
+       **绕过了 Arm → PF 的交接**，Arm 起不起来都无所谓
         ↓
 mlx5_core 绑定成功 → enp59s0f0np0 / enp59s0f1np1 出现，ibstat 的 CA 数 4 → 6
 ```
+
+> ### ⚠️⚠️ 2026-11-10 实测推翻了一条推论
+>
+> 首版这里曾写：**"NIC 模式下 Arm 核心本来就不需要工作，接不接那根线都不影响"**。
+> **这只对弃用的 `SEPARATED_HOST` 路径成立，对官方 `OFFLOAD_ENGINE` 路径不成立。**
+>
+> 官方路径下 `INTERNAL_CPU_MODEL` 仍是 `EMBEDDED_CPU`（且是出厂默认、不建议改），
+> 卡仍声明"本芯片有内嵌 CPU 掌管网卡" ⇒ **Arm 必须启动完成向 PF 的交接**。
+> ATX 未接 ⇒ BL31 halt ⇒ 交接永远完不成 ⇒ PF 卡在 `pre-initializing` ⇒ `-110`。
+>
+> **实测（15:16 断电冷启动后）：flash / `Current` / `BF_MODE` 三个层面全都已是 NIC 模式，
+> PF 依然起不来。** 完整的验证过程与机制分析见 §6.10。
 
 > ⚠️ **重要含义**：ATX 辅助供电没接 ⇒ **装 BFB 也救不了 DPU 模式**。
 > 2026-11-10 实测：`bfb-install` 推流直接失败（`cat: write error: Connection timed out`
@@ -191,6 +262,12 @@ mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_OFFLOAD_ENGINE=ENABLE
 >
 > ⚠️ 我那条 `SEPARATED_HOST` 走法的副作用：**它会让 `INTERNAL_CPU_OFFLOAD_ENGINE`
 > 从 `mlxconfig q` 里整个消失** —— 而那正是 NVIDIA 指定的模式判据（详见 §6.7）。
+>
+> 🔴 **实测补记（2026-11-10 晚）**：上面这条官方命令**在本卡没能修好网卡** ——
+> 写上 `DISABLED` 后 `BF_MODE` 确实变成 `NIC mode`、`mlxconfig -e q` 的 `Current` 列也变了，
+> 但 host PF 依然 `-110`。后来又补了 BF2 那三个参数（`EXT_HOST_PF`）**依然无效** ——
+> 因为**卡上没接那根 8-pin ATX 线**。
+> **完整实验记录见 §6.10，根因见 §6.9。**
 
 ### 3.2b 当时实际用的命令（已弃用路径，仅作历史记录）
 
@@ -334,6 +411,9 @@ networkctl list        # enp59 应从 unmanaged 变成 configured
 
 ## 四、最终状态
 
+> ⚠️ **本节描述的是 2026-11-05 那次（弃用 `SEPARATED_HOST` 路径）的终态，不是当前状态。**
+> 当前状态见文首「🔴 当前状态」框 —— **网卡不可用**。
+
 | 端口 | 网卡 | 状态 |
 |---|---|---|
 | **端口 2** | `enp59s0f1np1` | ✅ **UP，`Speed: 100000Mb/s`，全双工**，`carrier=1`，`<UP,LOWER_UP>`，`Link detected: yes` |
@@ -394,7 +474,9 @@ mlxconfig -d /dev/mst/mt41692_pciconf0 -y set INTERNAL_CPU_MODEL=EMBEDDED_CPU
 
 > ✅ 而且 `INTERNAL_CPU_MODEL` 的**出厂默认值就是 `EMBEDDED_CPU(1)`**
 > （`mlxconfig -e q` 的 `Default` 列实测），所以"还原"其实就是**回到默认值**。
-> 2026-11-10 该卡已还原为默认的 DPU 模式，`INTERNAL_CPU_OFFLOAD_ENGINE = ENABLED(0)`。
+>
+> ⚠️ **注意：2026-11-10 晚的当前状态是 NIC 模式**（`OFFLOAD_ENGINE = DISABLED(1)`），
+> **不是** DPU 模式 —— 见文首「🔴 当前状态」框。
 
 完整旧配置快照在目标机：`/root/bf3-mlxconfig-BEFORE-20261105-191847.txt`
 
@@ -430,7 +512,7 @@ ls /dev/rshim0/               # boot  console  misc  rshim
 
 | 字段 | 含义 |
 |---|---|
-| `BF_MODE` | `DPU mode` / `NIC mode` —— ⚠️ **在本卡上不可信，见 6.7 节** |
+| `BF_MODE` | `DPU mode` / `NIC mode` —— **跟随 `INTERNAL_CPU_OFFLOAD_ENGINE`，不跟随 `INTERNAL_CPU_MODEL`**；可信边界见 6.7 节 |
 | `BOOT_MODE` | `0:rshim  1:emmc  2:emmc-boot-swap` —— 从哪引导 |
 | `OPN_STR` | 卡型号字符串；`N/A` = ARM/UEFI 没走到填它的阶段 |
 | `UP_TIME` | DPU 上电秒数 —— **复位是否真的发生的铁证**（软复位成功会归零） |
@@ -499,12 +581,15 @@ Nov 10 12:02:26  mlx5_core: probe of 0000:3b:00.1 failed with error -110
 > 别去查"驱动版本残留"。手动 `systemctl restart openibd` 之所以能"修好"，
 > 只是因为那时内核的 probe 早已失败完毕、脚本没有设备可等 —— **治标不治本**。
 
-### 6.7 ⚠️ `BF_MODE` 在本卡上不可信 —— 别被它误导（重要更正）
+### 6.7 `BF_MODE` 的真相：跟随 `INTERNAL_CPU_OFFLOAD_ENGINE`（2026-11-10 二次更正）
 
-**症状**：`INTERNAL_CPU_MODEL = SEPARATED_HOST(0)`、host PF 正常绑定、100G 链路已 up，
-但 `cat /dev/rshim0/misc` 里的 `BF_MODE` 依然显示 **`DPU mode`**。
+> **本节经历了两次更正**，第一版结论（"它是噪音、不可信"）**也是错的**。
+> 最终结论在下面「最终结论」小节。过程保留，因为这个坑很容易再踩。
 
-**原因**（查证 rshim 源码 —— 仓库名是 **`Mellanox/rshim-user-space`**，不是 `Mellanox/rshim`；
+**第一版观察到的症状**：`INTERNAL_CPU_MODEL = SEPARATED_HOST(0)`、host PF 正常绑定、
+100G 链路已 up，但 `cat /dev/rshim0/misc` 里的 `BF_MODE` 依然显示 **`DPU mode`**。
+
+**实现**（rshim 源码 —— 仓库名是 **`Mellanox/rshim-user-space`**，不是 `Mellanox/rshim`；
 实现在 `src/rshim_fuse.c`）：
 
 ```c
@@ -519,17 +604,47 @@ const char* bf3_get_bf_mode(rshim_backend_t* bd) {
 }
 ```
 
-- `BF_MODE` 读的是 rshim 的 **`SCRATCHPAD2` 普通暂存寄存器**；
-- 它**由 DPU 侧（ARM / ATF / UEFI）写入上报**，**主机侧的 `mlxconfig` 根本不碰它**；
-- 而且这一行只在 `ver_id == RSHIM_BLUEFIELD_3` 时才打印。
+- `BF_MODE` 读的是 rshim 的 **`SCRATCHPAD2` 暂存寄存器**；
+- 它**由 DPU 侧（ARM / ATF）写入上报**，主机侧的 `mlxconfig` 不碰它；
+- 这一行只在 `ver_id == RSHIM_BLUEFIELD_3` 时才打印。
 
-**本卡的 ARM 从来没能启动**（`BOOT_MODE=1(emmc)` 但 eMMC 里没有 BFB），
-于是**没有任何人会去更新 SCRATCHPAD2** → 它保留的是残留/默认值，
-与 `INTERNAL_CPU_MODEL` 之间**没有因果关系**。
+#### ⭐ 最终结论（第三个数据点推翻了前两个）
 
-**结论 —— 本卡上判断模式只认这三条**：
+| 数据点 | `INTERNAL_CPU_MODEL` | `INTERNAL_CPU_OFFLOAD_ENGINE` | `BF_MODE` | 网卡 |
+|---|---|---|---|---|
+| ① 11-05 切成 NIC 模式后 | `SEPARATED_HOST(0)` | `ENABLED(0)`（**从未被改**，仍是出厂值） | `DPU mode` | ✅ 正常 |
+| ② 11-10 还原后 | `EMBEDDED_CPU(1)` | `ENABLED(0)` | `DPU mode` | ❌ 消失 |
+| ③ **11-10 走官方路径后** | `EMBEDDED_CPU(1)` | **`DISABLED(1)`** | **`NIC mode`** ✅ | ❌ 仍消失 |
 
-⭐⭐ **官方判据（原文照抄，2026-11-10 更正）**：
+⭐ **`BF_MODE` 与 `INTERNAL_CPU_OFFLOAD_ENGINE` 100% 一致 —— 它其实是可信的！**
+
+真相：
+
+1. `BF_MODE` **跟随 flash 里的 `INTERNAL_CPU_OFFLOAD_ENGINE`**
+   （ATF 在 BL31 读取配置后写入 `SCRATCHPAD2`）；
+2. 它**不跟随 `INTERNAL_CPU_MODEL`**；
+3. ① 之所以显示 `DPU mode`，是因为当时走的是弃用路径，
+   **`OFFLOAD_ENGINE` 根本没被改过**（仍是出厂默认 `ENABLED(0)`）——
+   **所以 `BF_MODE` 当时报得没错**，是我拿它去跟 `INTERNAL_CPU_MODEL` 比，
+   才得出"不可信"的错误结论。
+
+**⚠️ 但 `BF_MODE` 有一个重要边界**：它只反映**"ATF 认为该用哪个模式"**（≈ flash 配置），
+**不代表 PF 真的初始化成功**。数据点 ③ 就是铁证：`BF_MODE = NIC mode`、
+`mlxconfig` 的 `Current` 列也是 NIC 模式，**PF 依然 `-110`**
+（原因见 §6.9 / §6.10）。**模式对了 ≠ 网卡能出来。**
+
+#### 判断模式该看什么
+
+| 判据 | 权威性 |
+|---|---|
+| ⭐ **`mlxconfig -d <dev> q INTERNAL_CPU_OFFLOAD_ENGINE`** | ✅✅ **NVIDIA 官方指定的模式判据**（下表），也是"参数可见性"要求的那一个 |
+| `mlxconfig -d <dev> -e q` 的 **`Current` 列** | ✅ 正在运行的值，比 `Next Boot` 更能说明"是否已生效"（见 §6.10） |
+| `BF_MODE` | ✅ 能反映官方开关（见上），但**不能证明 PF 可用** |
+| `INTERNAL_CPU_MODEL` | ❌ **不能当模式判据** —— 出厂默认就是它，见下 |
+| 那 4 个派生参数是否消失 | ⚠️ 只对"用弃用参数切走"这一条路径有效 |
+| host PF 是否绑上 `mlx5_core` 并产出 netdev | ✅✅ **最终事实** |
+
+⭐⭐ **官方判据（原文照抄）**：
 
 ```bash
 host# mlxconfig -d /dev/mst/<device> q INTERNAL_CPU_OFFLOAD_ENGINE
@@ -541,36 +656,13 @@ host# mlxconfig -d /dev/mst/<device> q INTERNAL_CPU_OFFLOAD_ENGINE
 | `DISABLED(1)` | **NIC 模式** |
 | 带 `RO` 前缀（`RO INTERNAL_CPU_OFFLOAD_ENGINE ENABLED(0)`） | **DPU 模式 + Zero Trust**（只读，被限制） |
 
-| 判据 | 权威性 |
-|---|---|
-| ⭐ **`INTERNAL_CPU_OFFLOAD_ENGINE`** | ✅✅ **NVIDIA 官方指定的模式判据**（上表） |
-| `INTERNAL_CPU_MODEL` | ❌ **不能当模式判据** —— 见下方说明 |
-| 那 4 个派生参数是否消失 | ⚠️ 只对"用弃用参数切走"这一条路径有效 |
-| host PF 是否绑上 `mlx5_core` 并产出 netdev | ✅ 最终事实 |
-
-> ⚠️ **我原先写的"看 `INTERNAL_CPU_MODEL` + 看 4 个派生参数是否消失"是次优甚至误导的：**
-> - 一旦用了弃用的 `SEPARATED_HOST` 路径，`INTERNAL_CPU_OFFLOAD_ENGINE` 会**整个消失**，
->   官方判据就用不了了；
-> - 而走官方路径（只改 `OFFLOAD_ENGINE`）时，`INTERNAL_CPU_MODEL` **大概率始终是
->   `EMBEDDED_CPU`**，根本区分不出模式。
->
-> 所以 `INTERNAL_CPU_MODEL` 变化只是我那条弃用路径的**副作用**，不是模式指示器。
-
-`BF_MODE` 只在 **DPU 侧有正常运行的 OS** 时才有参考价值。本卡这种「ARM 无系统」的场景下
-**它是噪音 —— 看到 `DPU mode` 不要慌、更不要据此去重切模式。**
+> ⚠️ **`INTERNAL_CPU_MODEL` 为什么不能当判据**：
+> 它的**出厂默认值就是 `EMBEDDED_CPU(1)`**（`mlxconfig -e q` 的 `Default` 列实测），
+> 卡片无论处于 DPU 还是 NIC 模式，它都不变；只有走弃用的 `SEPARATED_HOST` 路径时它才变，
+> 而那纯粹是**副作用**（且会让 `OFFLOAD_ENGINE` 一起消失）。
 
 > 顺带纠正另一个容易误读的字段：misc 里的 `SECURE_NIC_MODE` 取自 `bd->locked_mode`，
 > 是 **rshim 的归属锁（ownership lock）**，跟"网卡模式"毫无关系。
-
-**实测：两个数据点证明它不跟随 `INTERNAL_CPU_MODEL`**（2026-11-10 补测）
-
-| 数据点 | `INTERNAL_CPU_MODEL` | `BF_MODE` | 网卡 |
-|---|---|---|---|
-| ① 11-05 切成 NIC 模式后 | `SEPARATED_HOST(0)` | **`DPU mode`** | ✅ 正常 |
-| ② 11-10 还原成 DPU 模式后 | `EMBEDDED_CPU(1)` | **`DPU mode`** | ❌ 消失 |
-
-**同一个 `BF_MODE` 值对应两种截然不同的模式** —— 足以排除它作为模式判据。
-含义：ARM 无系统时这个寄存器恒为其默认值 `DPU mode`，与 `INTERNAL_CPU_MODEL` 无关。
 
 > 顺带说明 `UP_TIME` 的正确用法：**温重启（`reboot`）不会让它归零**。
 > 2026-11-09 16:34 主机重启过一次（主机 `uptime` 只 19 小时），DPU 的 `UP_TIME`
@@ -657,11 +749,14 @@ ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
 | BMC `PCIe_NIC_Temp` | `61 °C` | 卡是通电的、在发热 |
 | eMMC 是否被写入 | `安装动作计数: 0` | ✅ **失败没伤卡**（还没进到写盘阶段） |
 
-**结论**：
+**结论（2026-11-10 晚二次更正）**：
 
 - ❌ 没接这根线 ⇒ **ARM 永远起不来 ⇒ DPU 模式永远不可能工作**，装 BFB 也救不了
-- ✅ 但 **NIC 模式不需要它** —— 这正是当初切 NIC 模式能修好、链路还能 100G up 的原因
-- ✅ 想上 DPU 功能：**必须先接 8-pin ATX 辅助供电线**（物理操作，软件无解）
+- ⚠️ **更正**：首版这里写的"NIC 模式不需要它"——**只对弃用的 `SEPARATED_HOST` 路径成立**。
+  **官方的 `INTERNAL_CPU_OFFLOAD_ENGINE=DISABLED` 路径同样需要它**（§6.10 有实测为证）：
+  该路径下 `INTERNAL_CPU_MODEL` 仍是 `EMBEDDED_CPU`，Arm 必须启动完成向 PF 的交接。
+- ✅ 所以：**想同时满足「参数可见 + 网卡可用」，必须先接这根 8-pin ATX 线**
+  （物理操作，软件无解）
 
 **这根线是什么**：卡上的外部供电连接器吃 **8-pin ATX(EPS 12V)**，
 **不是** PCIe 6+2。服务器上要从电源引一路空闲的 CPU 8-pin 供电过去。
@@ -669,14 +764,153 @@ ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
 
 ---
 
+### 6.10 ⭐ 官方路径实测全记录（2026-11-10 14:00–15:35）
+
+这一节是「官方参数到底够不够」的完整实验记录，也是判定"是否只剩 ATX"的全部依据。
+
+#### (1) `mlxconfig -e q` 的三列语义 —— 别再判反了
+
+```
+Configurations:                        Default          Current           Next Boot
+        INTERNAL_CPU_MODEL             EMBEDDED_CPU(1)  EMBEDDED_CPU(1)   EMBEDDED_CPU(1)
+   *    INTERNAL_CPU_PAGE_SUPPLIER      ECPF(0)          EXT_HOST_PF(1)    EXT_HOST_PF(1)
+   *    INTERNAL_CPU_ESWITCH_MANAGER    ECPF(0)          EXT_HOST_PF(1)    EXT_HOST_PF(1)
+   *    INTERNAL_CPU_IB_VPORT0          ECPF(0)          EXT_HOST_PF(1)    EXT_HOST_PF(1)
+   *    INTERNAL_CPU_OFFLOAD_ENGINE     ENABLED(0)       DISABLED(1)       DISABLED(1)
+```
+
+| 列 / 前缀 | 含义 |
+|---|---|
+| `Default` | **出厂默认值** |
+| `Current` | **当前正在运行的值** ← **判断"是否已生效"只看这一列** |
+| `Next Boot` | 下次复位后采用的值（`mlxconfig set` 改的就是它） |
+| 行首 `*` | 该行**与 `Default` 不同**（即被改过） |
+| 行首 `RO` | 只读参数 |
+
+**两个重要事实：**
+
+1. **`Default` 列 = DPU 模式** ⇒ 这张卡出厂就是 DPU 模式（DPU SKU 的正常出厂态）。
+2. ⭐ **`Current` 列也已经是 NIC 模式** ⇒ **配置确确实实已经生效了。**
+
+> ⚠️ 排查中我曾把列判反，误判成"配置没生效"，白折腾了一轮。
+> **记住：`-e q` 有 `Default / Current / Next Boot` 三列，判断生效只看 `Current`。**
+> 普通 `mlxconfig q` 只有 `Next Boot` 一列，**不能用来判断是否已生效**。
+
+#### (2) 实验：官方路径到底能不能修好本卡
+
+| 步骤 | 时刻 | 动作 | 结果 |
+|---|---|---|---|
+| 1 | 11-10 14:23 | `set INTERNAL_CPU_OFFLOAD_ENGINE=DISABLED` | 写 flash 成功 |
+| 2 | 11-10 14:41 | `set INTERNAL_CPU_PAGE_SUPPLIER=1 INTERNAL_CPU_ESWITCH_MANAGER=1 INTERNAL_CPU_IB_VPORT0=1` | ✅ 三个都变 `EXT_HOST_PF(1)`，**六行参数全在** |
+| 3 | 11-10 15:16 | **用户断 AC 冷启动** | 配置锁定（`Current` = NIC 模式） |
+| 4 | 11-10 15:19 | 主机开机，`mlx5_core` 探测 | ❌ **两个 PF 依然各 120s 超时 → `-110`** |
+
+冷启动后**三个层面全部确认是 NIC 模式**，而 PF 依然起不来：
+
+```
+mlxconfig -e q   Current 列   → OFFLOAD_ENGINE=DISABLED(1) + 三个 EXT_HOST_PF(1)
+/dev/rshim0/misc BF_MODE      → NIC mode
+mlxfwreset q     Reset-reason → Cold reset        ← 证明真的冷复位过
+最终结果                      → 3b:00.0/.1 无驱动、无 netdev、ibstat 仍只有 4 个 CA
+```
+
+> ⭐ 那三个参数的**有效值名是 `EXT_HOST_PF(1)`**（不是文档里常见的 `HOST(1)`）。
+> `mlxconfig set <param>=1` 的数值写法能用，但**读输出要认得这个名字**。
+
+#### (3) `mlxfwreset` 在本卡的支持情况（查过，这次用不上）
+
+```
+mlxfwreset -d /dev/mst/mt41692_pciconf0 -l 4 -t 0 q
+  Reset-levels:
+    0: Driver, PCI link, network link will remain up ("live-Patch")  -Not Supported
+    1: Only ARM side will not remain up ("Immediate reset")          -Not Supported
+    3: Driver restart and PCI reset                                  -Not Supported
+    4: Warm Reboot                                                   -Supported (default)
+  Reset-types:
+    0: Full chip reset                                               -Supported (default)
+    1: Phy-less reset                                                -Not Supported
+    2: NIC only reset (for SoC devices)                              -Not Supported
+    3: ARM only reset                                                -Not Supported
+    4: ARM OS shut down                                              -Not Supported
+  Reset-reason:                                                      Cold reset
+```
+
+- ✅ `-l 4 -t 0`（Warm Reboot / Full chip reset）是**本卡唯一支持的复位组合**，
+  也是"改了配置不想断 AC"时的官方手段；
+- ⚠️ **但本卡这次用不上** —— `Current` 列早已是 NIC 模式，复位改变不了任何东西，
+  问题不在"没生效"。**别再拿它当救命稻草。**
+
+#### (4) 🔴 新发现的运维影响：**每次开机 4 分钟，所有 Mellanox 网卡都消失**
+
+`mlx5_core` 的 PCI 探测是**串行**的。BF3 坏在 `pre-init` 时，驱动每个 PF 要干等 120 秒，
+两个 PF = **240 秒**，后面的 CX7/CX5 全部排队：
+
+```
+15:19:22  3b:00.0: firmware version: 32.47.1088    ← 轮到 BF3，开始等
+15:21:22  3b:00.0: -110（120s 超时）
+15:21:22  3b:00.1: firmware version: 32.47.1088    ← 再等
+15:23:22  3b:00.1: -110（又 120s）
+15:23:22  af:00.0: firmware version: 28.47.2682    ← CX7 这才轮到
+15:23:23  af:00.0 enp175s0f0np0: renamed from eth0 ← 网卡这才出现
+```
+
+**后果**：这台存储节点**每次重启后头 4 分钟内，`ip a` 只有 `lo / eno1 / eno2`**，
+`enp175s*`、`enp216s*` 全都**不存在**（不是 DOWN，是根本没被创建）。
+
+> ⚠️ 以后若再看到"网卡都没了"，**先算一下"开机时刻 + 4 分钟"** —— 大概率就是这个，
+> 不是新故障。**它也是"必须处理掉这张 BF3"的最强理由。**
+>
+> 缓解方向（**未实施**）：内核参数把 BF3 的 PCI ID 交给 `vfio-pci` 占住
+> （`vfio-pci.ids=15b3:a2dc`）或 BIOS 屏蔽该槽，让 `mlx5_core` 不去碰它 ⇒ 不再阻塞。
+
+#### (5) 附：`tmfifo_net0` 是什么
+
+rshim 启动后会多出一张 `tmfifo_net0`（TMFIFO = Tiny Management FIFO），
+是**主机 ↔ BF3 内部 Arm 的带外管理虚拟网卡**，走 rshim 传输层，**不是真网卡**：
+
+| 项 | 说明 |
+|---|---|
+| 谁创建 | `rshim` 用户态进程（**`rshim.service` 是 disabled，不自启**） |
+| 固定 MAC | `00:1a:ca:ff:ff:02`（主机侧）/ `...:01`（DPU 侧） |
+| 典型用途 | `bfb-install --rshim rshim0` 刷 BFB、看 DPU console、主机↔DPU 的 `192.168.100.1 ↔ 192.168.100.2` 管理网 |
+| 速度 | `UNKNOWN`（FIFO，带宽很低） |
+| 生命周期 | **rshim 一停它就消失** |
+| 与业务网 | 完全无关 |
+
+> ⚠️ 它**没有 IPv4 是正常的**：`192.168.100.1/24` 本来该由 `rshim.service` 配，
+> 而该服务是 disabled、需手动起，所以只有 IPv6 链路本地。
+> `mlxconfig` 走的是 MST PCI 设备（`/dev/mst/mt41692_pciconf0`），**不经过它**。
+
+#### (6) 本轮操作留痕（目标机 `/root/`）
+
+| 文件 | 内容 |
+|---|---|
+| `/root/bf3-mlxconfig-NICMODE2-BEFORE-20261110-144141.txt` | 补那三个 `EXT_HOST_PF` 之前的完整快照 |
+| `/root/bf3-mlxconfig-NICMODE-BEFORE-20261110-142348.txt` | 改 `OFFLOAD_ENGINE` 之前的完整快照 |
+| `/root/bf3-mlxconfig-BEFORE-20261105-191847.txt` | 11-05 最初的 DPU 模式快照 |
+| `/root/bfb-install-20261110-135048.log` | BFB 安装失败日志（708 B） |
+
+---
+
 ## 七、如果冷启动后仍然 -110
 
-那就干净地排除了模式问题，定性为**固件损坏**，按顺序退：
+> ⚠️ **2026-11-10 更新：这个情况已经真实发生过了** —— 官方路径 + 断 AC 冷启动后
+> **依然是 `-110`**，而**结论不是固件损坏，是 ATX 辅助供电未接**（见 §6.9 / §6.10）。
+> **所以别急着刷固件 —— 先确认那根 8-pin ATX 线接了没有。**
 
-1. **重刷固件**：`flint -d /dev/mst/mt41692_pciconf0 -i <fw.bin> burn`
-   （需匹配 PSID `MT_0000001115` 的固件包）
-2. **装 BFB 恢复**：通过 rshim 通道装一个匹配该 PSID 的 BFB
-3. **报修换卡**
+**正确的排查顺序：先排物理，再排固件。**
+
+1. **先看卡自己怎么说 ATX**：`cat /dev/rshim0/misc`（或看 rshim 日志）里有没有
+   `ERR[BL31]: ATX missing` / `ATX power not detected! Halting system!!`
+   —— **有 ⇒ 先接线，刷任何固件都没用。**
+2. **再确认模式真的已生效**：`mlxconfig -d <dev> -e q` 看 **`Current` 列**
+   （**不是** `Next Boot` 列），以及 `/dev/rshim0/misc` 的 `BF_MODE`。
+3. **前两条都确认无误后，才轮到怀疑固件**，按顺序退：
+
+   - **重刷固件**：`flint -d /dev/mst/mt41692_pciconf0 -i <fw.bin> burn`
+     （需匹配 PSID `MT_0000001115` 的固件包）
+   - **装 BFB 恢复**：通过 rshim 通道装一个匹配该 PSID 的 BFB
+   - **报修换卡**
 
 > 补充：这台服务器**没有外网**（`github.com` 解析不了，apt 只有 sugon 镜像 + 本地 DOCA 仓），
 > BFB / 固件包需要从别处传上去。`bfb-tool` 只能对已有的 BFB/bf-bundle 做拆包重组，**不负责下载**。

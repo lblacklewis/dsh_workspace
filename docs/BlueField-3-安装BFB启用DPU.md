@@ -1,9 +1,22 @@
 # BlueField-3 安装 BFB：让 DPU 侧的 ARM 跑起来
 
-> **前置状态**：本机 BF3 已处于 DPU 模式（`INTERNAL_CPU_MODEL=EMBEDDED_CPU`），
+> **前置状态**：本机 BF3 曾处于 DPU 模式（`INTERNAL_CPU_OFFLOAD_ENGINE=ENABLED(0)`），
 > 但 eMMC 里没有可引导系统 → host PF 探测 `-110`、网卡消失。
 > 本文解决"给 ARM 装一个系统"这一步。
 > 前情与故障链条见 [`BlueField-3-DPU转NIC模式排查.md`](BlueField-3-DPU转NIC模式排查.md)。
+>
+> ## 🔴 2026-11-10 晚 状态更新：**卡现在是 NIC 模式，但网卡依然不可用**
+>
+> | 层面 | 值（实测） |
+> |---|---|
+> | flash（`Next Boot`）/ 运行中（`Current`）/ 卡侧（`BF_MODE`） | **NIC 模式**：`OFFLOAD_ENGINE=DISABLED(1)` + 三个 `EXT_HOST_PF(1)` |
+> | host PF | ❌ **仍 `-110`**（`wait_fw_init` 120s 超时，网卡不出现） |
+>
+> ⚠️ **所以"装 BFB"目前不是当前任务** —— 用户已在 2026-11-10 决定走 **NIC 模式**
+> （放弃了 DPU 功能）。**本文保留，作为将来若接上 ATX 线、想回头上 DPU 时的操作手册。**
+>
+> ⭐ **但本文第六节第 1 条（ATX）现在对两条路都适用** ——
+> **官方 NIC 模式路径同样需要那根线**（实测见排查文档 §6.9 / §6.10）。
 
 ---
 
@@ -306,6 +319,18 @@ ASSERT[BL31]: CRITICAL ERROR: ATX power not detected! Halting system!!
 **要做的**：把 **8-pin ATX(EPS 12V) 辅助供电线**接上（**不是** PCIe 6+2），再重跑 `bfb-install`。
 参考 [BF3 平台用户指南 · Pinouts Description](https://networking-docs.nvidia.com/bf3dpu/pinouts-description)。
 
+> ⭐ **2026-11-10 晚补充：这根线同样卡住"官方 NIC 模式"路径。**
+>
+> 实测：`OFFLOAD_ENGINE=DISABLED(1)` + 三个 `EXT_HOST_PF(1)` + 断 AC 冷启动后，
+> **flash / `Current` 列 / `BF_MODE` 三个层面全部确认是 NIC 模式，host PF 依然 `-110`**。
+> 机制：官方 NIC 路径下 `INTERNAL_CPU_MODEL` 仍是 `EMBEDDED_CPU`
+> （那是它的出厂默认值，也是"参数不消失"的前提），卡仍声明"有内嵌 CPU 掌管网卡"
+> ⇒ **Arm 必须启动完成向 PF 的交接**；ATX 未接 ⇒ BL31 halt ⇒ 交接完不成。
+>
+> **结论：想同时拿到「`OFFLOAD_ENGINE` 参数可见」+「网卡可用」，同样必须接这根线。**
+> 唯一能绕过它的是弃用的 `SEPARATED_HOST`，代价是 `OFFLOAD_ENGINE` 从配置里消失。
+> 完整实验记录见排查文档 §6.10。
+
 ### 2. 安全启动签名
 
 见第三节末尾。**只用官方签名 BF-bundle，不要自建镜像。**
@@ -369,6 +394,9 @@ ibstat | grep -c '^CA '
 1. **BFB 是走 rshim / SoC 管理口装的，与 DPU/NIC 模式开关
    （`INTERNAL_CPU_OFFLOAD_ENGINE`）无关** ——
    两种模式下都能装。既然要 DPU 模式且已经是 DPU 模式，**直接装，不要再切模式。**
+   > ⚠️ **但两种模式都必须先接 ATX 线** —— 2026-11-10 实测：没接就直接
+   > `Error: Failed to push boot stream via local rshim` + BL31 `ATX power not detected!`。
+   > 详见第六节第 1 条。
 2. **装 BFB 不需要再断 AC** —— rshim 装 BFB 会让 SoC 自己从 rshim 引导一次完成安装。
    这是好消息：走 DPU 路线比走 NIC 路线**少付一次断电的代价**。
 
